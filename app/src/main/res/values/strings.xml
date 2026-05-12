@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">StepLog</string>
+
+    <!-- Bottom Navigation -->
+    <string name="nav_today">今日</string>
+    <string name="nav_calendar">カレンダー</string>
+    <string name="nav_graph">グラフ</string>
+    <string name="nav_settings">設定</string>
+
+    <!-- Home Screen -->
+    <string name="label_steps">歩</string>
+    <string name="label_steps_unit">歩</string>
+    <string name="label_body_condition">体調の記録</string>
+    <string name="label_dizziness">めまい度</string>
+    <string name="label_fatigue">疲労度</string>
+    <string name="label_sleep_hours">睡眠時間</string>
+    <string name="label_memo">メモ（任意）</string>
+    <string name="label_pressure">気圧</string>
+    <string name="label_pressure_unit">hPa</string>
+    <string name="label_sleep_hours_unit">時間</string>
+    <string name="action_save">記録する</string>
+    <string name="message_saved">記録しました</string>
+
+    <!-- Condition levels (0=calm, 5=very difficult) -->
+    <string-array name="condition_labels">
+        <item>穏やか</item>
+        <item>少し</item>
+        <item>やや</item>
+        <item>気になる</item>
+        <item>つらい</item>
+        <item>とてもつらい</item>
+    </string-array>
+
+    <!-- Health Connect -->
+    <string name="health_connect_unavailable">この端末では歩数の自動取得ができません。手動入力をご利用ください。</string>
+    <string name="health_connect_permission_rationale">歩数記録のためにHealth Connectへのアクセスを許可してください。データはこの端末にのみ保存されます。</string>
+
+    <!-- Settings -->
+    <string name="settings_section_data">データ</string>
+    <string name="settings_export_csv">CSVエクスポート</string>
+    <string name="settings_delete_all">データをすべて削除</string>
+    <string name="settings_delete_confirm">すべてのデータを削除します。この操作は取り消せません。</string>
+    <string name="settings_section_appearance">外観</string>
+    <string name="settings_theme">テーマ</string>
+    <string name="settings_theme_system">システム</string>
+    <string name="settings_theme_light">ライト</string>
+    <string name="settings_theme_dark">ダーク</string>
+    <string name="settings_section_api">API設定</string>
+    <string name="settings_api_key">OpenWeatherMap APIキー</string>
+    <string name="settings_section_about">情報</string>
+    <string name="settings_about_message">このアプリは「歩け」と言わないアプリです。</string>
+
+    <!-- Errors (calm, non-alarming phrasing) -->
+    <string name="error_steps_fetch">歩数の取得ができませんでした</string>
+    <string name="error_weather_fetch">気圧情報を取得できませんでした</string>
+    <string name="error_save">記録の保存ができませんでした</string>
+
+    <!-- Placeholder -->
+    <string name="placeholder_memo">今日の気づきなど（任意）</string>
+    <string name="placeholder_no_data">データがありません</string>
+</resources>

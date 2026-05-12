@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Base theme required by Android before Compose takes over -->
+    <style name="Theme.StepLog" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>
