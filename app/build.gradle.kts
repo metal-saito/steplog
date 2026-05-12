@@ -8,7 +8,7 @@ plugins {
 
 android {
     namespace = "com.cellomsai.steplog"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.cellomsai.steplog"
