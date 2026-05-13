@@ -1,8 +1,6 @@
 package com.cellomsai.steplog.data.healthconnect
 
 import android.content.Context
-import android.content.Intent
-import android.content.pm.PackageManager
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.StepsRecord
@@ -24,20 +22,6 @@ class HealthConnectManager @Inject constructor(
 
     fun isAvailable(): Boolean =
         HealthConnectClient.getSdkStatus(context) == HealthConnectClient.SDK_AVAILABLE
-
-    /**
-     * HC の実際のパッケージ名を動的に解決して権限リクエストインテントを返す。
-     * null の場合は HC が権限画面を提供していない。
-     */
-    fun buildPermissionRequestIntent(): Intent? {
-        val probe = Intent("androidx.health.ACTION_REQUEST_PERMISSIONS")
-        val matches = context.packageManager.queryIntentActivities(probe, PackageManager.MATCH_ALL)
-        val pkg = matches.firstOrNull()?.activityInfo?.packageName ?: return null
-        return Intent("androidx.health.ACTION_REQUEST_PERMISSIONS").apply {
-            setPackage(pkg)
-            putExtra("androidx.health.extra.permissions", permissions.toTypedArray())
-        }
-    }
 
     fun sdkStatusLabel(): String = when (HealthConnectClient.getSdkStatus(context)) {
         HealthConnectClient.SDK_AVAILABLE -> "SDK_AVAILABLE"

@@ -1,6 +1,5 @@
 package com.cellomsai.steplog.ui.screens.home
 
-import android.content.ActivityNotFoundException
 import android.content.Intent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -80,22 +79,37 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
         }
     }
 
-    // PackageManager で HC の実パッケージを解決して権限画面を開く
-    fun launchHcPermissionRequest() {
-        val intent = viewModel.healthConnect.buildPermissionRequestIntent()
-        if (intent != null) {
+    // HC を開く：複数の方法を順番に試す。例外は全種類を捕捉する
+    fun openHealthConnect() {
+        val candidates = buildList {
+            // 1. HC 権限リクエスト画面（パッケージ指定なし・システムが解決）
+            add(Intent("androidx.health.ACTION_REQUEST_PERMISSIONS").apply {
+                putExtra(
+                    "androidx.health.extra.permissions",
+                    viewModel.healthConnect.permissions.toTypedArray(),
+                )
+            })
+            // 2. HC 設定画面
+            add(Intent("androidx.health.ACTION_HEALTH_CONNECT_SETTINGS"))
+            // 3. HC アプリを直接起動
+            context.packageManager
+                .getLaunchIntentForPackage("com.google.android.apps.healthdata")
+                ?.let { add(it) }
+        }
+
+        for (intent in candidates) {
             try {
                 context.startActivity(intent)
                 return
-            } catch (_: ActivityNotFoundException) { }
-        }
-        // 権限画面が開けない場合は HC 設定へ
-        try {
-            context.startActivity(Intent("androidx.health.ACTION_HEALTH_CONNECT_SETTINGS"))
-        } catch (_: ActivityNotFoundException) {
-            scope.launch {
-                snackbarHostState.showSnackbar("Health Connect を起動できませんでした。アプリを更新してください。")
+            } catch (_: Exception) {
+                // 次の候補へ
             }
+        }
+
+        scope.launch {
+            snackbarHostState.showSnackbar(
+                "Health Connect が起動できません。Play ストアでインストール・更新してください。"
+            )
         }
     }
 
@@ -151,7 +165,7 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
                             title = "歩数の取得が許可されていません",
                             message = "Health Connect への接続を許可すると歩数が自動で記録されます。\n[診断: ${uiState.healthConnectDebugStatus}]",
                             primaryLabel = "Health Connect に接続する",
-                            onPrimary = { launchHcPermissionRequest() },
+                            onPrimary = { openHealthConnect() },
                         )
                     } else {
                         HealthConnectGuidanceCard(
@@ -161,17 +175,7 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
                                 "② 「アプリとデータ」→「アプリの接続」\n" +
                                 "③ Google Fit を選んで許可",
                             primaryLabel = "Health Connect を開く",
-                            onPrimary = {
-                                try {
-                                    context.startActivity(
-                                        Intent("androidx.health.ACTION_HEALTH_CONNECT_SETTINGS")
-                                    )
-                                } catch (e: ActivityNotFoundException) {
-                                    scope.launch {
-                                        snackbarHostState.showSnackbar("Health Connect が見つかりません。")
-                                    }
-                                }
-                            },
+                            onPrimary = { openHealthConnect() },
                             secondaryLabel = "更新",
                             onSecondary = { viewModel.refreshSteps() },
                         )
