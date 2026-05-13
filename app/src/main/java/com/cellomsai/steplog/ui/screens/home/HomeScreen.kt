@@ -36,7 +36,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.health.connect.client.PermissionController
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -81,33 +80,22 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
         }
     }
 
-    // Health Connect 権限リクエスト：パッケージ固定→なし→設定画面の順に試す
+    // PackageManager で HC の実パッケージを解決して権限画面を開く
     fun launchHcPermissionRequest() {
-        val sdkIntent = PermissionController
-            .createRequestPermissionResultContract()
-            .createIntent(context, viewModel.healthConnect.permissions)
-
-        // パッケージ指定なしで同じアクション・エクストラを再送
-        val noPackageIntent = Intent(sdkIntent.action).apply {
-            sdkIntent.extras?.let { putExtras(it) }
-        }
-
-        // HC 設定画面へのフォールバック
-        val settingsIntent = Intent("androidx.health.ACTION_HEALTH_CONNECT_SETTINGS")
-
-        val tried = listOf(sdkIntent, noPackageIntent, settingsIntent)
-        for (intent in tried) {
+        val intent = viewModel.healthConnect.buildPermissionRequestIntent()
+        if (intent != null) {
             try {
                 context.startActivity(intent)
                 return
-            } catch (_: ActivityNotFoundException) {
-                continue
-            }
+            } catch (_: ActivityNotFoundException) { }
         }
-
-        // 3 つすべて失敗した場合
-        scope.launch {
-            snackbarHostState.showSnackbar("Health Connect を起動できませんでした。アプリを更新してください。")
+        // 権限画面が開けない場合は HC 設定へ
+        try {
+            context.startActivity(Intent("androidx.health.ACTION_HEALTH_CONNECT_SETTINGS"))
+        } catch (_: ActivityNotFoundException) {
+            scope.launch {
+                snackbarHostState.showSnackbar("Health Connect を起動できませんでした。アプリを更新してください。")
+            }
         }
     }
 

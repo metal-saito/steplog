@@ -42,9 +42,19 @@
 
     </application>
 
-    <!-- Health Connect availability check -->
     <queries>
+        <!-- Health Connect standalone app -->
         <package android:name="com.google.android.apps.healthdata" />
+        <!-- Discover which app handles HC permission requests dynamically -->
+        <intent>
+            <action android:name="androidx.health.ACTION_REQUEST_PERMISSIONS" />
+        </intent>
+        <intent>
+            <action android:name="androidx.health.ACTION_HEALTH_CONNECT_SETTINGS" />
+        </intent>
+        <intent>
+            <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+        </intent>
     </queries>
 
 </manifest>
