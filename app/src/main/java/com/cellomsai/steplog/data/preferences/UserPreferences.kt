@@ -17,6 +17,8 @@ import javax.inject.Singleton
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "user_prefs")
 
+private const val DEFAULT_WEATHER_API_KEY = "a27dcc491ad3f394cd83b84b910a2931"
+
 @Singleton
 class UserPreferences @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -37,7 +39,7 @@ class UserPreferences @Inject constructor(
     }
 
     val weatherApiKey: Flow<String> = context.dataStore.data.map { prefs ->
-        prefs[Keys.WEATHER_API_KEY] ?: ""
+        prefs[Keys.WEATHER_API_KEY] ?: DEFAULT_WEATHER_API_KEY
     }
 
     suspend fun setAppTheme(theme: AppTheme) {

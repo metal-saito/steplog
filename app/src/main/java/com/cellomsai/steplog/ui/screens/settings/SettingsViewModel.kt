@@ -1,7 +1,6 @@
 package com.cellomsai.steplog.ui.screens.settings
 
 import android.content.Context
-import android.os.Environment
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cellomsai.steplog.data.preferences.UserPreferences
@@ -22,6 +21,7 @@ data class SettingsUiState(
     val appTheme: AppTheme = AppTheme.SYSTEM,
     val weatherApiKey: String = "",
     val message: String? = null,
+    val csvFile: File? = null,
 )
 
 @HiltViewModel
@@ -76,17 +76,20 @@ class SettingsViewModel @Inject constructor(
                         )
                     }
                 }
-                val dir = context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS)
-                    ?: context.filesDir
-                val file = File(dir, "steplog_${LocalDate.now()}.csv")
+                // キャッシュディレクトリに書き出して共有シートで渡す
+                val file = File(context.cacheDir, "steplog_${LocalDate.now()}.csv")
                 file.writeText(csv)
-                file.absolutePath
-            }.onSuccess { path ->
-                _uiState.update { it.copy(message = "保存しました:\n$path") }
+                file
+            }.onSuccess { file ->
+                _uiState.update { it.copy(csvFile = file) }
             }.onFailure {
                 _uiState.update { it.copy(message = "エクスポートに失敗しました") }
             }
         }
+    }
+
+    fun onCsvShared() {
+        _uiState.update { it.copy(csvFile = null) }
     }
 
     fun deleteAll() {

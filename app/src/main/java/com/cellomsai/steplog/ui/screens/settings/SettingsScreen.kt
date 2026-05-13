@@ -1,5 +1,6 @@
 package com.cellomsai.steplog.ui.screens.settings
 
+import android.content.Intent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -38,7 +39,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.cellomsai.steplog.ui.theme.AppTheme
 
@@ -47,6 +50,7 @@ import com.cellomsai.steplog.ui.theme.AppTheme
 fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
     var showDeleteDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.message) {
@@ -54,6 +58,26 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
             snackbarHostState.showSnackbar(it)
             viewModel.clearMessage()
         }
+    }
+
+    // CSV ファイルが準備できたら共有シートを開く
+    LaunchedEffect(uiState.csvFile) {
+        val file = uiState.csvFile ?: return@LaunchedEffect
+        runCatching {
+            val uri = FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                file,
+            )
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "text/csv"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                putExtra(Intent.EXTRA_SUBJECT, "StepLog データ")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            context.startActivity(Intent.createChooser(intent, "CSV を共有"))
+        }
+        viewModel.onCsvShared()
     }
 
     Scaffold(
@@ -103,6 +127,12 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
 
             // データ
             SettingsSection(title = "データ") {
+                Text(
+                    text = "記録データを CSV 形式で書き出せます。メール・Google Drive・ファイルアプリなど好みのアプリで受け取れます。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
                 Button(
                     onClick = { viewModel.exportCsv() },
                     modifier = Modifier.fillMaxWidth(),
@@ -110,7 +140,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                         containerColor = MaterialTheme.colorScheme.secondary,
                     ),
                 ) {
-                    Text("CSV エクスポート")
+                    Text("CSV を共有する")
                 }
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedButton(
@@ -124,12 +154,19 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                 }
             }
 
-            // API設定
-            SettingsSection(title = "API設定") {
+            // 気圧データ設定
+            SettingsSection(title = "気圧データ（任意）") {
+                Text(
+                    text = "メニエール病では気圧の変化が症状に影響することがあります。OpenWeatherMap の無料 API キーを登録すると、記録時に気圧データが自動で付加されます。\n\n登録しない場合も歩数・体調の記録は通常通り使えます。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(12.dp))
                 OutlinedTextField(
                     value = uiState.weatherApiKey,
                     onValueChange = { viewModel.onApiKeyChange(it) },
                     label = { Text("OpenWeatherMap API キー") },
+                    placeholder = { Text("任意") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
