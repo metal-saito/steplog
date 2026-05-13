@@ -1,7 +1,7 @@
 package com.cellomsai.steplog.ui.screens.home
 
+import android.content.ActivityNotFoundException
 import android.content.Intent
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -31,6 +31,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
@@ -44,6 +45,7 @@ import com.cellomsai.steplog.ui.components.BodyConditionInput
 import com.cellomsai.steplog.ui.components.StepsDisplay
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,6 +54,7 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val scope = rememberCoroutineScope()
 
     // Health Connect から戻ったときに権限状態と歩数を再チェック
     DisposableEffect(lifecycleOwner) {
@@ -62,13 +65,6 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
-
-    // Health Connect パーミッション要求ランチャー
-    val requestPermissions = rememberLauncherForActivityResult(
-        contract = PermissionController.createRequestPermissionResultContract(),
-    ) { granted ->
-        viewModel.onPermissionsResult(granted)
     }
 
     LaunchedEffect(uiState.savedToastVisible) {
@@ -82,6 +78,20 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
         uiState.errorMessage?.let { msg ->
             snackbarHostState.showSnackbar(msg)
             viewModel.clearError()
+        }
+    }
+
+    // Health Connect 権限リクエストを Context 経由で直接発行する
+    fun launchHcPermissionRequest() {
+        try {
+            val intent = PermissionController
+                .createRequestPermissionResultContract()
+                .createIntent(context, viewModel.healthConnect.permissions)
+            context.startActivity(intent)
+        } catch (e: ActivityNotFoundException) {
+            scope.launch {
+                snackbarHostState.showSnackbar("Health Connect が見つかりません。アプリをインストールまたは更新してください。")
+            }
         }
     }
 
@@ -133,17 +143,13 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
 
                 if (uiState.healthConnectAvailable && uiState.steps == 0 && !uiState.isLoadingSteps) {
                     if (!uiState.healthConnectPermissionGranted) {
-                        // 権限未付与 → ランチャーを直接起動
                         HealthConnectGuidanceCard(
                             title = "歩数の取得が許可されていません",
                             message = "Health Connect への接続を許可すると歩数が自動で記録されます。",
                             primaryLabel = "Health Connect に接続する",
-                            onPrimary = {
-                                requestPermissions.launch(viewModel.healthConnect.permissions)
-                            },
+                            onPrimary = { launchHcPermissionRequest() },
                         )
                     } else {
-                        // 権限あり・歩数 0 → データソース未連携
                         HealthConnectGuidanceCard(
                             title = "歩数データが見つかりません",
                             message = "Google Fit などのアプリを Health Connect に連携するとデータが取得できます。\n\n" +
@@ -152,8 +158,15 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
                                 "③ Google Fit を選んで許可",
                             primaryLabel = "Health Connect を開く",
                             onPrimary = {
-                                val intent = Intent("androidx.health.ACTION_HEALTH_CONNECT_SETTINGS")
-                                runCatching { context.startActivity(intent) }
+                                try {
+                                    context.startActivity(
+                                        Intent("androidx.health.ACTION_HEALTH_CONNECT_SETTINGS")
+                                    )
+                                } catch (e: ActivityNotFoundException) {
+                                    scope.launch {
+                                        snackbarHostState.showSnackbar("Health Connect が見つかりません。")
+                                    }
+                                }
                             },
                             secondaryLabel = "更新",
                             onSecondary = { viewModel.refreshSteps() },
