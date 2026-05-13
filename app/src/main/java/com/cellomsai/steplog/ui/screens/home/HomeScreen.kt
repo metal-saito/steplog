@@ -70,6 +70,13 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
         viewModel.onActivityRecognitionResult(granted)
     }
 
+    // 位置情報パーミッションリクエストランチャー（気圧取得用）
+    val requestLocation = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) viewModel.onLocationPermissionGranted()
+    }
+
     // Health Connect から戻ったときに権限状態と歩数を再チェック
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -81,13 +88,23 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    // 初回にパーミッション状態をチェック
+    // 初回にパーミッション状態をチェック＆位置情報権限をリクエスト
     LaunchedEffect(Unit) {
-        val granted = ContextCompat.checkSelfPermission(
+        val arGranted = ContextCompat.checkSelfPermission(
             context,
             Manifest.permission.ACTIVITY_RECOGNITION
         ) == PackageManager.PERMISSION_GRANTED
-        viewModel.onActivityRecognitionResult(granted)
+        viewModel.onActivityRecognitionResult(arGranted)
+
+        val locGranted = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        if (locGranted) {
+            viewModel.onLocationPermissionGranted()
+        } else {
+            requestLocation.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+        }
     }
 
     LaunchedEffect(uiState.savedToastVisible) {

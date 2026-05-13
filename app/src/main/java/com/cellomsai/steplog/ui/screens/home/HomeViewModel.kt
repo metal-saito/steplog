@@ -117,6 +117,10 @@ class HomeViewModel @Inject constructor(
         refreshSteps()
     }
 
+    fun onLocationPermissionGranted() {
+        viewModelScope.launch { fetchWeatherIfNeeded(LocalDate.now()) }
+    }
+
     fun refreshSteps() {
         val today = LocalDate.now()
         viewModelScope.launch {
