@@ -69,10 +69,9 @@ class HomeViewModel @Inject constructor(
             )
         }
 
-        if (hcAvailable) {
-            viewModelScope.launch { syncPermissionState() }
-        } else if (activityRecognitionGranted && sensorAvailable) {
-            refreshSteps()
+        viewModelScope.launch {
+            syncPermissionState()
+            if (activityRecognitionGranted && sensorAvailable) refreshSteps()
         }
     }
 
@@ -83,19 +82,17 @@ class HomeViewModel @Inject constructor(
             android.Manifest.permission.ACTIVITY_RECOGNITION
         ) == PackageManager.PERMISSION_GRANTED
         _uiState.update { it.copy(activityRecognitionGranted = activityRecognitionGranted) }
-
-        if (_uiState.value.healthConnectAvailable) {
-            viewModelScope.launch { syncPermissionState() }
-        } else {
+        viewModelScope.launch {
+            syncPermissionState()
             refreshSteps()
         }
     }
 
-    // 権限状態を確認し、付与済みなら歩数を取得
+    // HC 権限状態を確認する（失敗しても refreshSteps は止めない）
     private suspend fun syncPermissionState() {
-        val hasPerms = healthConnect.hasPermissions()
+        if (!_uiState.value.healthConnectAvailable) return
+        val hasPerms = runCatching { healthConnect.hasPermissions() }.getOrDefault(false)
         _uiState.update { it.copy(healthConnectPermissionGranted = hasPerms) }
-        refreshSteps()
     }
 
     fun onPermissionsResult(granted: Set<String>) {
