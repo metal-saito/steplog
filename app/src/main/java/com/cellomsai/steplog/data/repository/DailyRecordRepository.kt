@@ -23,10 +23,9 @@ class DailyRecordRepository @Inject constructor(
         dao.findByDate(date.toString())
 
     suspend fun saveSteps(date: LocalDate, steps: Int) {
-        val existing = dao.findByDate(date.toString())
-        val record = existing?.copy(steps = steps, updatedAt = System.currentTimeMillis())
-            ?: DailyRecord(date = date.toString(), steps = steps)
-        dao.upsert(record)
+        val now = System.currentTimeMillis()
+        val updated = dao.updateSteps(date.toString(), steps, now)
+        if (updated == 0) dao.upsert(DailyRecord(date = date.toString(), steps = steps))
     }
 
     suspend fun saveBodyCondition(
@@ -36,28 +35,30 @@ class DailyRecordRepository @Inject constructor(
         sleepHours: Float?,
         memo: String?,
     ) {
-        val existing = dao.findByDate(date.toString())
-        val record = existing?.copy(
-            dizzinessLevel = dizzinessLevel,
-            fatigueLevel = fatigueLevel,
-            sleepHours = sleepHours,
-            memo = memo,
-            updatedAt = System.currentTimeMillis(),
-        ) ?: DailyRecord(
+        val now = System.currentTimeMillis()
+        val updated = dao.updateBodyCondition(
             date = date.toString(),
-            dizzinessLevel = dizzinessLevel,
-            fatigueLevel = fatigueLevel,
-            sleepHours = sleepHours,
+            dizziness = dizzinessLevel,
+            fatigue = fatigueLevel,
+            sleep = sleepHours,
             memo = memo,
+            updatedAt = now,
         )
-        dao.upsert(record)
+        if (updated == 0) dao.upsert(
+            DailyRecord(
+                date = date.toString(),
+                dizzinessLevel = dizzinessLevel,
+                fatigueLevel = fatigueLevel,
+                sleepHours = sleepHours,
+                memo = memo,
+            )
+        )
     }
 
     suspend fun savePressure(date: LocalDate, pressure: Float) {
-        val existing = dao.findByDate(date.toString())
-        val record = existing?.copy(pressure = pressure, updatedAt = System.currentTimeMillis())
-            ?: DailyRecord(date = date.toString(), pressure = pressure)
-        dao.upsert(record)
+        val now = System.currentTimeMillis()
+        val updated = dao.updatePressure(date.toString(), pressure, now)
+        if (updated == 0) dao.upsert(DailyRecord(date = date.toString(), pressure = pressure))
     }
 
     suspend fun upsertAll(records: List<DailyRecord>) = dao.upsertAll(records)
