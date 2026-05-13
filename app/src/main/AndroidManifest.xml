@@ -45,11 +45,11 @@
             </intent-filter>
         </activity>
 
-        <!-- Health Connect availability check -->
-        <queries>
-            <package android:name="com.google.android.apps.healthdata" />
-        </queries>
-
     </application>
+
+    <!-- Health Connect availability check -->
+    <queries>
+        <package android:name="com.google.android.apps.healthdata" />
+    </queries>
 
 </manifest>
