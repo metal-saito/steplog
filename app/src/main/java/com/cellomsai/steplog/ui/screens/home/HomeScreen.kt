@@ -13,11 +13,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Air
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -136,6 +140,27 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 },
+                actions = {
+                    uiState.record?.pressure?.let { pressure ->
+                        Row(
+                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.padding(end = 16.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Air,
+                                contentDescription = "気圧",
+                                modifier = Modifier.size(14.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Text(
+                                text = "%.0f hPa".format(pressure),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
                 ),
@@ -169,6 +194,10 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
                 }
 
                 StepsDisplay(steps = uiState.steps)
+
+                uiState.record?.pressure?.let { pressure ->
+                    PressureChip(pressure = pressure)
+                }
 
                 if (uiState.steps == 0 && !uiState.isLoadingSteps) {
                     when {
@@ -221,16 +250,34 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
                     },
                 )
 
-                uiState.record?.pressure?.let { pressure ->
-                    Text(
-                        text = "気圧 %.1f hPa".format(pressure),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-
                 Spacer(modifier = Modifier.height(8.dp))
             }
+        }
+    }
+}
+
+@Composable
+private fun PressureChip(pressure: Float) {
+    Surface(
+        shape = MaterialTheme.shapes.small,
+        color = MaterialTheme.colorScheme.surfaceVariant,
+    ) {
+        Row(
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Air,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = "気圧  %.1f hPa".format(pressure),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
