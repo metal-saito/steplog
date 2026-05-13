@@ -79,32 +79,22 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
         }
     }
 
-    // HC を開く：複数の方法を順番に試す。例外は全種類を捕捉する
+    // HC を開く：設定画面 → アプリ直接起動 の順で試す
     fun openHealthConnect() {
-        val candidates = buildList {
-            // 1. HC 権限リクエスト画面（パッケージ指定なし・システムが解決）
-            add(Intent("androidx.health.ACTION_REQUEST_PERMISSIONS").apply {
-                putExtra(
-                    "androidx.health.extra.permissions",
-                    viewModel.healthConnect.permissions.toTypedArray(),
-                )
-            })
-            // 2. HC 設定画面
-            add(Intent("androidx.health.ACTION_HEALTH_CONNECT_SETTINGS"))
-            // 3. HC アプリを直接起動
-            context.packageManager
-                .getLaunchIntentForPackage("com.google.android.apps.healthdata")
-                ?.let { add(it) }
-        }
+        // 1. HC 設定画面（最も確実）
+        try {
+            context.startActivity(Intent("androidx.health.ACTION_HEALTH_CONNECT_SETTINGS"))
+            return
+        } catch (_: Exception) { }
 
-        for (intent in candidates) {
-            try {
-                context.startActivity(intent)
-                return
-            } catch (_: Exception) {
-                // 次の候補へ
-            }
-        }
+        // 2. HC アプリをパッケージ名で直接起動
+        try {
+            val intent = context.packageManager
+                .getLaunchIntentForPackage("com.google.android.apps.healthdata")
+                ?: error("not found")
+            context.startActivity(intent)
+            return
+        } catch (_: Exception) { }
 
         scope.launch {
             snackbarHostState.showSnackbar(
