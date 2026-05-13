@@ -21,6 +21,7 @@ data class HomeUiState(
     val isSaving: Boolean = false,
     val isLoadingSteps: Boolean = false,
     val healthConnectAvailable: Boolean = true,
+    val healthConnectPermissionGranted: Boolean = false,
     val showPermissionRationale: Boolean = false,
     val savedToastVisible: Boolean = false,
     val errorMessage: String? = null,
@@ -49,15 +50,21 @@ class HomeViewModel @Inject constructor(
 
     fun checkPermissions() {
         viewModelScope.launch {
-            if (healthConnect.isAvailable() && !healthConnect.hasPermissions()) {
+            val hasPerms = healthConnect.isAvailable() && healthConnect.hasPermissions()
+            _uiState.update { it.copy(healthConnectPermissionGranted = hasPerms) }
+            if (!hasPerms && healthConnect.isAvailable()) {
                 _uiState.update { it.copy(showPermissionRationale = true) }
+            } else if (hasPerms) {
+                refreshSteps()
             }
         }
     }
 
     fun onPermissionsResult(granted: Set<String>) {
         viewModelScope.launch {
-            if (healthConnect.hasPermissions()) {
+            val hasPerms = healthConnect.hasPermissions()
+            _uiState.update { it.copy(healthConnectPermissionGranted = hasPerms) }
+            if (hasPerms) {
                 refreshSteps()
             }
         }

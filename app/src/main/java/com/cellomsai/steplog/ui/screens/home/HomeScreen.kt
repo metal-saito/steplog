@@ -1,5 +1,6 @@
 package com.cellomsai.steplog.ui.screens.home
 
+import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -11,11 +12,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -27,6 +31,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.health.connect.client.PermissionController
@@ -41,6 +46,7 @@ import java.util.Locale
 fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
 
     // Health Connect パーミッション要求ランチャー
     val requestPermissions = rememberLauncherForActivityResult(
@@ -136,6 +142,45 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
                 }
 
                 StepsDisplay(steps = uiState.steps)
+
+                if (uiState.healthConnectAvailable &&
+                    uiState.healthConnectPermissionGranted &&
+                    uiState.steps == 0 &&
+                    !uiState.isLoadingSteps
+                ) {
+                    Surface(
+                        shape = MaterialTheme.shapes.medium,
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Text(
+                                text = "歩数が取得できていません",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            )
+                            Text(
+                                text = "Google Fit などのアプリの歩数データを取り込むには、Health Connect でデータソースの連携が必要です。",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            )
+                            Button(
+                                onClick = {
+                                    val intent = Intent("androidx.health.ACTION_HEALTH_CONNECT_SETTINGS")
+                                    runCatching { context.startActivity(intent) }
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.secondary,
+                                ),
+                            ) {
+                                Text("Health Connect を開く")
+                            }
+                        }
+                    }
+                }
 
                 BodyConditionInput(
                     initialDizziness = uiState.record?.dizzinessLevel,
