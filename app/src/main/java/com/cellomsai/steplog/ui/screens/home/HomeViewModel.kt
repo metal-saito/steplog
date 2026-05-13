@@ -22,6 +22,7 @@ data class HomeUiState(
     val isLoadingSteps: Boolean = false,
     val healthConnectAvailable: Boolean = true,
     val healthConnectPermissionGranted: Boolean = false,
+    val healthConnectDebugStatus: String = "",
     val savedToastVisible: Boolean = false,
     val errorMessage: String? = null,
 )
@@ -43,7 +44,13 @@ class HomeViewModel @Inject constructor(
             }
         }
         val available = healthConnect.isAvailable()
-        _uiState.update { it.copy(healthConnectAvailable = available) }
+        val statusLabel = healthConnect.sdkStatusLabel()
+        _uiState.update {
+            it.copy(
+                healthConnectAvailable = available,
+                healthConnectDebugStatus = statusLabel,
+            )
+        }
         if (available) {
             viewModelScope.launch { syncPermissionState() }
         }

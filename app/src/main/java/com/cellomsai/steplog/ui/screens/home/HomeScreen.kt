@@ -81,17 +81,33 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
         }
     }
 
-    // Health Connect 権限リクエストを Context 経由で直接発行する
+    // Health Connect 権限リクエスト：パッケージ固定→なし→設定画面の順に試す
     fun launchHcPermissionRequest() {
-        try {
-            val intent = PermissionController
-                .createRequestPermissionResultContract()
-                .createIntent(context, viewModel.healthConnect.permissions)
-            context.startActivity(intent)
-        } catch (e: ActivityNotFoundException) {
-            scope.launch {
-                snackbarHostState.showSnackbar("Health Connect が見つかりません。アプリをインストールまたは更新してください。")
+        val sdkIntent = PermissionController
+            .createRequestPermissionResultContract()
+            .createIntent(context, viewModel.healthConnect.permissions)
+
+        // パッケージ指定なしで同じアクション・エクストラを再送
+        val noPackageIntent = Intent(sdkIntent.action).apply {
+            sdkIntent.extras?.let { putExtras(it) }
+        }
+
+        // HC 設定画面へのフォールバック
+        val settingsIntent = Intent("androidx.health.ACTION_HEALTH_CONNECT_SETTINGS")
+
+        val tried = listOf(sdkIntent, noPackageIntent, settingsIntent)
+        for (intent in tried) {
+            try {
+                context.startActivity(intent)
+                return
+            } catch (_: ActivityNotFoundException) {
+                continue
             }
+        }
+
+        // 3 つすべて失敗した場合
+        scope.launch {
+            snackbarHostState.showSnackbar("Health Connect を起動できませんでした。アプリを更新してください。")
         }
     }
 
@@ -145,7 +161,7 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
                     if (!uiState.healthConnectPermissionGranted) {
                         HealthConnectGuidanceCard(
                             title = "歩数の取得が許可されていません",
-                            message = "Health Connect への接続を許可すると歩数が自動で記録されます。",
+                            message = "Health Connect への接続を許可すると歩数が自動で記録されます。\n[診断: ${uiState.healthConnectDebugStatus}]",
                             primaryLabel = "Health Connect に接続する",
                             onPrimary = { launchHcPermissionRequest() },
                         )
