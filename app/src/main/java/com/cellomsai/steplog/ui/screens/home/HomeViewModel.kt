@@ -1,11 +1,16 @@
 package com.cellomsai.steplog.ui.screens.home
 
+import android.content.Context
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cellomsai.steplog.data.database.entity.DailyRecord
 import com.cellomsai.steplog.data.healthconnect.HealthConnectManager
 import com.cellomsai.steplog.data.repository.DailyRecordRepository
+import com.cellomsai.steplog.data.sensor.StepSensorManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -25,12 +30,16 @@ data class HomeUiState(
     val healthConnectDebugStatus: String = "",
     val savedToastVisible: Boolean = false,
     val errorMessage: String? = null,
+    val activityRecognitionGranted: Boolean = false,
+    val sensorAvailable: Boolean = false,
 )
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val repository: DailyRecordRepository,
     val healthConnect: HealthConnectManager,
+    private val stepSensorManager: StepSensorManager,
+    @ApplicationContext private val context: Context,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -43,24 +52,45 @@ class HomeViewModel @Inject constructor(
                 _uiState.update { it.copy(record = record, steps = record?.steps ?: 0) }
             }
         }
-        val available = healthConnect.isAvailable()
+
+        // センサー可用性チェック
+        val sensorAvailable = stepSensorManager.isAvailable
+        // ACTIVITY_RECOGNITION パーミッションチェック
+        val activityRecognitionGranted = ContextCompat.checkSelfPermission(
+            context,
+            android.Manifest.permission.ACTIVITY_RECOGNITION
+        ) == PackageManager.PERMISSION_GRANTED
+
+        val hcAvailable = healthConnect.isAvailable()
         val statusLabel = healthConnect.sdkStatusLabel()
         _uiState.update {
             it.copy(
-                healthConnectAvailable = available,
+                healthConnectAvailable = hcAvailable,
                 healthConnectDebugStatus = statusLabel,
+                sensorAvailable = sensorAvailable,
+                activityRecognitionGranted = activityRecognitionGranted,
             )
         }
-        if (available) {
+
+        if (hcAvailable) {
             viewModelScope.launch { syncPermissionState() }
+        } else if (activityRecognitionGranted && sensorAvailable) {
+            refreshSteps()
         }
     }
 
     // ON_RESUME から呼ばれる：権限状態を再確認して歩数を更新
     fun onResume() {
-        if (!_uiState.value.healthConnectAvailable) return
-        viewModelScope.launch {
-            syncPermissionState()
+        val activityRecognitionGranted = ContextCompat.checkSelfPermission(
+            context,
+            android.Manifest.permission.ACTIVITY_RECOGNITION
+        ) == PackageManager.PERMISSION_GRANTED
+        _uiState.update { it.copy(activityRecognitionGranted = activityRecognitionGranted) }
+
+        if (_uiState.value.healthConnectAvailable) {
+            viewModelScope.launch { syncPermissionState() }
+        } else {
+            refreshSteps()
         }
     }
 
@@ -68,7 +98,7 @@ class HomeViewModel @Inject constructor(
     private suspend fun syncPermissionState() {
         val hasPerms = healthConnect.hasPermissions()
         _uiState.update { it.copy(healthConnectPermissionGranted = hasPerms) }
-        if (hasPerms) refreshSteps()
+        refreshSteps()
     }
 
     fun onPermissionsResult(granted: Set<String>) {
@@ -79,20 +109,27 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    fun onActivityRecognitionResult(granted: Boolean) {
+        _uiState.update { it.copy(activityRecognitionGranted = granted) }
+        refreshSteps()
+    }
+
     fun refreshSteps() {
         val today = LocalDate.now()
         viewModelScope.launch {
             _uiState.update { it.copy(isLoadingSteps = true, errorMessage = null) }
-            runCatching { healthConnect.readSteps(today) }
-                .onSuccess { steps ->
-                    repository.saveSteps(today, steps)
+            val steps = when {
+                _uiState.value.activityRecognitionGranted && _uiState.value.sensorAvailable ->
+                    runCatching { stepSensorManager.readTodaySteps() }.getOrDefault(0)
+                _uiState.value.healthConnectPermissionGranted ->
+                    runCatching { healthConnect.readSteps(today) }.getOrDefault(0)
+                else -> {
                     _uiState.update { it.copy(isLoadingSteps = false) }
+                    return@launch
                 }
-                .onFailure {
-                    _uiState.update {
-                        it.copy(isLoadingSteps = false, errorMessage = "歩数の取得ができませんでした")
-                    }
-                }
+            }
+            runCatching { repository.saveSteps(today, steps) }
+            _uiState.update { it.copy(isLoadingSteps = false) }
         }
     }
 

@@ -1,6 +1,10 @@
 package com.cellomsai.steplog.ui.screens.home
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -35,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -54,6 +59,13 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
 
+    // ACTIVITY_RECOGNITION パーミッションリクエストランチャー
+    val requestActivityRecognition = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        viewModel.onActivityRecognitionResult(granted)
+    }
+
     // Health Connect から戻ったときに権限状態と歩数を再チェック
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -63,6 +75,15 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    // 初回にパーミッション状態をチェック
+    LaunchedEffect(Unit) {
+        val granted = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACTIVITY_RECOGNITION
+        ) == PackageManager.PERMISSION_GRANTED
+        viewModel.onActivityRecognitionResult(granted)
     }
 
     LaunchedEffect(uiState.savedToastVisible) {
@@ -137,7 +158,7 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
                     .padding(horizontal = 20.dp, vertical = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                if (!uiState.healthConnectAvailable) {
+                if (!uiState.healthConnectAvailable && !uiState.sensorAvailable) {
                     Text(
                         text = "この端末では歩数の自動取得ができません。",
                         style = MaterialTheme.typography.bodySmall,
@@ -149,26 +170,52 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
 
                 StepsDisplay(steps = uiState.steps)
 
-                if (uiState.healthConnectAvailable && uiState.steps == 0 && !uiState.isLoadingSteps) {
-                    if (!uiState.healthConnectPermissionGranted) {
-                        HealthConnectGuidanceCard(
-                            title = "歩数の取得が許可されていません",
-                            message = "Health Connect への接続を許可すると歩数が自動で記録されます。\n[診断: ${uiState.healthConnectDebugStatus}]",
-                            primaryLabel = "Health Connect に接続する",
-                            onPrimary = { openHealthConnect() },
-                        )
-                    } else {
-                        HealthConnectGuidanceCard(
-                            title = "歩数データが見つかりません",
-                            message = "Google Fit などのアプリを Health Connect に連携するとデータが取得できます。\n\n" +
-                                "① Health Connect を開く\n" +
-                                "② 「アプリとデータ」→「アプリの接続」\n" +
-                                "③ Google Fit を選んで許可",
-                            primaryLabel = "Health Connect を開く",
-                            onPrimary = { openHealthConnect() },
-                            secondaryLabel = "更新",
-                            onSecondary = { viewModel.refreshSteps() },
-                        )
+                if (uiState.steps == 0 && !uiState.isLoadingSteps) {
+                    when {
+                        // センサーが使えるが ACTIVITY_RECOGNITION が未許可
+                        uiState.sensorAvailable && !uiState.activityRecognitionGranted -> {
+                            HealthConnectGuidanceCard(
+                                title = "歩数センサーの許可が必要です",
+                                message = "歩数センサーを使うには「身体活動の認識」の許可が必要です。",
+                                primaryLabel = "歩数センサーを許可する",
+                                onPrimary = {
+                                    requestActivityRecognition.launch(
+                                        Manifest.permission.ACTIVITY_RECOGNITION
+                                    )
+                                },
+                            )
+                        }
+                        // センサー利用可能・権限あり・歩数0
+                        uiState.sensorAvailable && uiState.activityRecognitionGranted -> {
+                            HealthConnectGuidanceCard(
+                                title = "歩数データが見つかりません",
+                                message = "今日の歩数がまだ記録されていません。",
+                                primaryLabel = "更新",
+                                onPrimary = { viewModel.refreshSteps() },
+                            )
+                        }
+                        // センサーなし・HC も設定されていない
+                        !uiState.sensorAvailable && uiState.healthConnectAvailable && !uiState.healthConnectPermissionGranted -> {
+                            HealthConnectGuidanceCard(
+                                title = "歩数の取得が許可されていません",
+                                message = "Health Connect への接続を許可すると歩数が自動で記録されます。\n[診断: ${uiState.healthConnectDebugStatus}]",
+                                primaryLabel = "Health Connect に接続する",
+                                onPrimary = { openHealthConnect() },
+                            )
+                        }
+                        !uiState.sensorAvailable && uiState.healthConnectAvailable && uiState.healthConnectPermissionGranted -> {
+                            HealthConnectGuidanceCard(
+                                title = "歩数データが見つかりません",
+                                message = "Google Fit などのアプリを Health Connect に連携するとデータが取得できます。\n\n" +
+                                    "① Health Connect を開く\n" +
+                                    "② 「アプリとデータ」→「アプリの接続」\n" +
+                                    "③ Google Fit を選んで許可",
+                                primaryLabel = "Health Connect を開く",
+                                onPrimary = { openHealthConnect() },
+                                secondaryLabel = "更新",
+                                onSecondary = { viewModel.refreshSteps() },
+                            )
+                        }
                     }
                 }
 

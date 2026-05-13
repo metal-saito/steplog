@@ -17,6 +17,9 @@
     <!-- WorkManager (for weather sync) -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!-- Step counter sensor (Android 10+) -->
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+
     <application
         android:name=".StepLogApp"
         android:allowBackup="true"
