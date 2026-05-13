@@ -9,6 +9,7 @@ import com.cellomsai.steplog.data.database.entity.DailyRecord
 import com.cellomsai.steplog.data.healthconnect.HealthConnectManager
 import com.cellomsai.steplog.data.repository.DailyRecordRepository
 import com.cellomsai.steplog.data.sensor.StepSensorManager
+import com.cellomsai.steplog.data.weather.WeatherRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,6 +39,7 @@ class HomeViewModel @Inject constructor(
     private val repository: DailyRecordRepository,
     val healthConnect: HealthConnectManager,
     private val stepSensorManager: StepSensorManager,
+    private val weatherRepository: WeatherRepository,
     @ApplicationContext private val context: Context,
 ) : ViewModel() {
 
@@ -52,9 +54,7 @@ class HomeViewModel @Inject constructor(
             }
         }
 
-        // センサー可用性チェック
         val sensorAvailable = stepSensorManager.isAvailable
-        // ACTIVITY_RECOGNITION パーミッションチェック
         val activityRecognitionGranted = ContextCompat.checkSelfPermission(
             context,
             android.Manifest.permission.ACTIVITY_RECOGNITION
@@ -73,9 +73,10 @@ class HomeViewModel @Inject constructor(
             syncPermissionState()
             if (activityRecognitionGranted && sensorAvailable) refreshSteps()
         }
+        viewModelScope.launch { fetchWeatherIfNeeded(today) }
     }
 
-    // ON_RESUME から呼ばれる：権限状態を再確認して歩数を更新
+    // ON_RESUME から呼ばれる：権限状態を再確認して歩数・気圧を更新
     fun onResume() {
         val activityRecognitionGranted = ContextCompat.checkSelfPermission(
             context,
@@ -86,6 +87,7 @@ class HomeViewModel @Inject constructor(
             syncPermissionState()
             refreshSteps()
         }
+        viewModelScope.launch { fetchWeatherIfNeeded(LocalDate.now()) }
     }
 
     // HC 権限状態を確認する（失敗しても refreshSteps は止めない）
@@ -93,6 +95,13 @@ class HomeViewModel @Inject constructor(
         if (!_uiState.value.healthConnectAvailable) return
         val hasPerms = runCatching { healthConnect.hasPermissions() }.getOrDefault(false)
         _uiState.update { it.copy(healthConnectPermissionGranted = hasPerms) }
+    }
+
+    // 当日の気圧がまだ未取得のときだけ API を叩く
+    private suspend fun fetchWeatherIfNeeded(today: LocalDate) {
+        if (_uiState.value.record?.pressure != null) return
+        val pressure = weatherRepository.fetchPressure() ?: return
+        runCatching { repository.savePressure(today, pressure) }
     }
 
     fun onPermissionsResult(granted: Set<String>) {
