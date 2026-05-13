@@ -71,13 +71,6 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
         viewModel.onPermissionsResult(granted)
     }
 
-    LaunchedEffect(uiState.launchPermissionRequest) {
-        if (uiState.launchPermissionRequest) {
-            requestPermissions.launch(viewModel.healthConnect.permissions)
-            viewModel.onPermissionRequestLaunched()
-        }
-    }
-
     LaunchedEffect(uiState.savedToastVisible) {
         if (uiState.savedToastVisible) {
             snackbarHostState.showSnackbar("記録しました")
@@ -140,12 +133,14 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
 
                 if (uiState.healthConnectAvailable && uiState.steps == 0 && !uiState.isLoadingSteps) {
                     if (!uiState.healthConnectPermissionGranted) {
-                        // 権限未付与 → 権限リクエストを直接発行
+                        // 権限未付与 → ランチャーを直接起動
                         HealthConnectGuidanceCard(
                             title = "歩数の取得が許可されていません",
                             message = "Health Connect への接続を許可すると歩数が自動で記録されます。",
                             primaryLabel = "Health Connect に接続する",
-                            onPrimary = { viewModel.requestPermissions() },
+                            onPrimary = {
+                                requestPermissions.launch(viewModel.healthConnect.permissions)
+                            },
                         )
                     } else {
                         // 権限あり・歩数 0 → データソース未連携

@@ -22,7 +22,6 @@ data class HomeUiState(
     val isLoadingSteps: Boolean = false,
     val healthConnectAvailable: Boolean = true,
     val healthConnectPermissionGranted: Boolean = false,
-    val launchPermissionRequest: Boolean = false,
     val savedToastVisible: Boolean = false,
     val errorMessage: String? = null,
 )
@@ -63,15 +62,6 @@ class HomeViewModel @Inject constructor(
         val hasPerms = healthConnect.hasPermissions()
         _uiState.update { it.copy(healthConnectPermissionGranted = hasPerms) }
         if (hasPerms) refreshSteps()
-    }
-
-    // カードのボタンから直接 PermissionController を起動する
-    fun requestPermissions() {
-        _uiState.update { it.copy(launchPermissionRequest = true) }
-    }
-
-    fun onPermissionRequestLaunched() {
-        _uiState.update { it.copy(launchPermissionRequest = false) }
     }
 
     fun onPermissionsResult(granted: Set<String>) {
