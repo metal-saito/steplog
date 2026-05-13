@@ -143,11 +143,7 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
 
                 StepsDisplay(steps = uiState.steps)
 
-                if (uiState.healthConnectAvailable &&
-                    uiState.healthConnectPermissionGranted &&
-                    uiState.steps == 0 &&
-                    !uiState.isLoadingSteps
-                ) {
+                if (uiState.healthConnectAvailable && uiState.steps == 0 && !uiState.isLoadingSteps) {
                     Surface(
                         shape = MaterialTheme.shapes.medium,
                         color = MaterialTheme.colorScheme.secondaryContainer,
@@ -158,25 +154,33 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             Text(
-                                text = "歩数が取得できていません",
+                                text = if (uiState.healthConnectPermissionGranted) "歩数が取得できていません" else "歩数の自動取得が未設定です",
                                 style = MaterialTheme.typography.titleSmall,
                                 color = MaterialTheme.colorScheme.onSecondaryContainer,
                             )
                             Text(
-                                text = "Google Fit などのアプリの歩数データを取り込むには、Health Connect でデータソースの連携が必要です。",
+                                text = if (uiState.healthConnectPermissionGranted) {
+                                    "Google Fit などのアプリの歩数データを取り込むには、Health Connect でデータソースの連携が必要です。「Health Connect を開く」→「アプリとデータ」→「Google Fit」を連携してください。"
+                                } else {
+                                    "歩数を自動で記録するには Health Connect へのアクセス許可が必要です。"
+                                },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSecondaryContainer,
                             )
                             Button(
                                 onClick = {
-                                    val intent = Intent("androidx.health.ACTION_HEALTH_CONNECT_SETTINGS")
-                                    runCatching { context.startActivity(intent) }
+                                    if (uiState.healthConnectPermissionGranted) {
+                                        val intent = Intent("androidx.health.ACTION_HEALTH_CONNECT_SETTINGS")
+                                        runCatching { context.startActivity(intent) }
+                                    } else {
+                                        viewModel.checkPermissions()
+                                    }
                                 },
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = MaterialTheme.colorScheme.secondary,
                                 ),
                             ) {
-                                Text("Health Connect を開く")
+                                Text(if (uiState.healthConnectPermissionGranted) "Health Connect を開く" else "許可を設定する")
                             }
                         }
                     }
