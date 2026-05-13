@@ -27,7 +27,6 @@ data class HomeUiState(
     val isLoadingSteps: Boolean = false,
     val healthConnectAvailable: Boolean = true,
     val healthConnectPermissionGranted: Boolean = false,
-    val healthConnectDebugStatus: String = "",
     val savedToastVisible: Boolean = false,
     val errorMessage: String? = null,
     val activityRecognitionGranted: Boolean = false,
@@ -62,11 +61,9 @@ class HomeViewModel @Inject constructor(
         ) == PackageManager.PERMISSION_GRANTED
 
         val hcAvailable = healthConnect.isAvailable()
-        val statusLabel = healthConnect.sdkStatusLabel()
         _uiState.update {
             it.copy(
                 healthConnectAvailable = hcAvailable,
-                healthConnectDebugStatus = statusLabel,
                 sensorAvailable = sensorAvailable,
                 activityRecognitionGranted = activityRecognitionGranted,
             )

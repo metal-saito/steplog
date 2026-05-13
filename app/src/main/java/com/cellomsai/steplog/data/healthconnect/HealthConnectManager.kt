@@ -23,13 +23,6 @@ class HealthConnectManager @Inject constructor(
     fun isAvailable(): Boolean =
         HealthConnectClient.getSdkStatus(context) == HealthConnectClient.SDK_AVAILABLE
 
-    fun sdkStatusLabel(): String = when (HealthConnectClient.getSdkStatus(context)) {
-        HealthConnectClient.SDK_AVAILABLE -> "SDK_AVAILABLE"
-        HealthConnectClient.SDK_UNAVAILABLE -> "SDK_UNAVAILABLE"
-        HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED -> "UPDATE_REQUIRED"
-        else -> "UNKNOWN"
-    }
-
     private fun client(): HealthConnectClient = HealthConnectClient.getOrCreate(context)
 
     suspend fun hasPermissions(): Boolean {

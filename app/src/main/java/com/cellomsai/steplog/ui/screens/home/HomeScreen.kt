@@ -185,20 +185,11 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
                                 },
                             )
                         }
-                        // センサー利用可能・権限あり・歩数0
-                        uiState.sensorAvailable && uiState.activityRecognitionGranted -> {
-                            HealthConnectGuidanceCard(
-                                title = "歩数データが見つかりません",
-                                message = "今日の歩数がまだ記録されていません。",
-                                primaryLabel = "更新",
-                                onPrimary = { viewModel.refreshSteps() },
-                            )
-                        }
                         // センサーなし・HC も設定されていない
                         !uiState.sensorAvailable && uiState.healthConnectAvailable && !uiState.healthConnectPermissionGranted -> {
                             HealthConnectGuidanceCard(
                                 title = "歩数の取得が許可されていません",
-                                message = "Health Connect への接続を許可すると歩数が自動で記録されます。\n[診断: ${uiState.healthConnectDebugStatus}]",
+                                message = "Health Connect への接続を許可すると歩数が自動で記録されます。",
                                 primaryLabel = "Health Connect に接続する",
                                 onPrimary = { openHealthConnect() },
                             )
