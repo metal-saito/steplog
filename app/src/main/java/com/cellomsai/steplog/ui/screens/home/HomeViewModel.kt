@@ -22,7 +22,7 @@ data class HomeUiState(
     val isLoadingSteps: Boolean = false,
     val healthConnectAvailable: Boolean = true,
     val healthConnectPermissionGranted: Boolean = false,
-    val showPermissionRationale: Boolean = false,
+    val launchPermissionRequest: Boolean = false,
     val savedToastVisible: Boolean = false,
     val errorMessage: String? = null,
 )
@@ -45,33 +45,41 @@ class HomeViewModel @Inject constructor(
         }
         val available = healthConnect.isAvailable()
         _uiState.update { it.copy(healthConnectAvailable = available) }
-        if (available) checkPermissions()
+        if (available) {
+            viewModelScope.launch { syncPermissionState() }
+        }
     }
 
-    fun checkPermissions() {
+    // ON_RESUME から呼ばれる：権限状態を再確認して歩数を更新
+    fun onResume() {
+        if (!_uiState.value.healthConnectAvailable) return
         viewModelScope.launch {
-            val hasPerms = healthConnect.isAvailable() && healthConnect.hasPermissions()
-            _uiState.update { it.copy(healthConnectPermissionGranted = hasPerms) }
-            if (!hasPerms && healthConnect.isAvailable()) {
-                _uiState.update { it.copy(showPermissionRationale = true) }
-            } else if (hasPerms) {
-                refreshSteps()
-            }
+            syncPermissionState()
         }
+    }
+
+    // 権限状態を確認し、付与済みなら歩数を取得
+    private suspend fun syncPermissionState() {
+        val hasPerms = healthConnect.hasPermissions()
+        _uiState.update { it.copy(healthConnectPermissionGranted = hasPerms) }
+        if (hasPerms) refreshSteps()
+    }
+
+    // カードのボタンから直接 PermissionController を起動する
+    fun requestPermissions() {
+        _uiState.update { it.copy(launchPermissionRequest = true) }
+    }
+
+    fun onPermissionRequestLaunched() {
+        _uiState.update { it.copy(launchPermissionRequest = false) }
     }
 
     fun onPermissionsResult(granted: Set<String>) {
         viewModelScope.launch {
             val hasPerms = healthConnect.hasPermissions()
             _uiState.update { it.copy(healthConnectPermissionGranted = hasPerms) }
-            if (hasPerms) {
-                refreshSteps()
-            }
+            if (hasPerms) refreshSteps()
         }
-    }
-
-    fun dismissPermissionRationale() {
-        _uiState.update { it.copy(showPermissionRationale = false) }
     }
 
     fun refreshSteps() {
