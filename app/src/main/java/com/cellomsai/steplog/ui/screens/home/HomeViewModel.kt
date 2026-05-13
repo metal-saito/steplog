@@ -21,6 +21,7 @@ data class HomeUiState(
     val isSaving: Boolean = false,
     val isLoadingSteps: Boolean = false,
     val healthConnectAvailable: Boolean = true,
+    val showPermissionRationale: Boolean = false,
     val savedToastVisible: Boolean = false,
     val errorMessage: String? = null,
 )
@@ -28,7 +29,7 @@ data class HomeUiState(
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val repository: DailyRecordRepository,
-    private val healthConnect: HealthConnectManager,
+    val healthConnect: HealthConnectManager,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -41,7 +42,29 @@ class HomeViewModel @Inject constructor(
                 _uiState.update { it.copy(record = record, steps = record?.steps ?: 0) }
             }
         }
-        _uiState.update { it.copy(healthConnectAvailable = healthConnect.isAvailable()) }
+        val available = healthConnect.isAvailable()
+        _uiState.update { it.copy(healthConnectAvailable = available) }
+        if (available) checkPermissions()
+    }
+
+    fun checkPermissions() {
+        viewModelScope.launch {
+            if (healthConnect.isAvailable() && !healthConnect.hasPermissions()) {
+                _uiState.update { it.copy(showPermissionRationale = true) }
+            }
+        }
+    }
+
+    fun onPermissionsResult(granted: Set<String>) {
+        viewModelScope.launch {
+            if (healthConnect.hasPermissions()) {
+                refreshSteps()
+            }
+        }
+    }
+
+    fun dismissPermissionRationale() {
+        _uiState.update { it.copy(showPermissionRationale = false) }
     }
 
     fun refreshSteps() {
@@ -53,7 +76,7 @@ class HomeViewModel @Inject constructor(
                     repository.saveSteps(today, steps)
                     _uiState.update { it.copy(isLoadingSteps = false) }
                 }
-                .onFailure { e ->
+                .onFailure {
                     _uiState.update {
                         it.copy(isLoadingSteps = false, errorMessage = "歩数の取得ができませんでした")
                     }

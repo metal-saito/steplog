@@ -1,10 +1,7 @@
 package com.cellomsai.steplog.ui.screens.home
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,13 +10,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -27,22 +25,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.health.connect.client.PermissionController
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.cellomsai.steplog.ui.components.BodyConditionInput
 import com.cellomsai.steplog.ui.components.StepsDisplay
-import com.cellomsai.steplog.ui.theme.StepLogTheme
-import kotlinx.coroutines.launch
-import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -51,7 +41,13 @@ import java.util.Locale
 fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
-    val scope = rememberCoroutineScope()
+
+    // Health Connect パーミッション要求ランチャー
+    val requestPermissions = rememberLauncherForActivityResult(
+        contract = PermissionController.createRequestPermissionResultContract(),
+    ) { granted ->
+        viewModel.onPermissionsResult(granted)
+    }
 
     LaunchedEffect(uiState.savedToastVisible) {
         if (uiState.savedToastVisible) {
@@ -67,12 +63,42 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
         }
     }
 
+    // パーミッション説明ダイアログ
+    if (uiState.showPermissionRationale) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissPermissionRationale() },
+            title = { Text("歩数の自動取得") },
+            text = {
+                Text(
+                    "歩数を自動で記録するために、Health Connect へのアクセスを許可してください。" +
+                        "\n\nデータはこの端末にのみ保存されます。",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.dismissPermissionRationale()
+                    requestPermissions.launch(viewModel.healthConnect.permissions)
+                }) {
+                    Text("許可する")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.dismissPermissionRationale() }) {
+                    Text("あとで", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            },
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     Text(
-                        text = uiState.today.format(DateTimeFormatter.ofPattern("yyyy年M月d日 (E)", Locale.JAPANESE)),
+                        text = uiState.today.format(
+                            DateTimeFormatter.ofPattern("yyyy年M月d日 (E)", Locale.JAPANESE)
+                        ),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -101,7 +127,7 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
             ) {
                 if (!uiState.healthConnectAvailable) {
                     Text(
-                        text = "この端末では歩数の自動取得ができません。手動入力をご利用ください。",
+                        text = "この端末では歩数の自動取得ができません。",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
@@ -133,14 +159,5 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
                 Spacer(modifier = Modifier.height(8.dp))
             }
         }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-private fun HomeScreenPreview() {
-    StepLogTheme {
-        // Preview without ViewModel
-        Text("HomeScreen Preview")
     }
 }
