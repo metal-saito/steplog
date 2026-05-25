@@ -71,7 +71,7 @@ class HomeViewModel @Inject constructor(
 
         viewModelScope.launch {
             syncPermissionState()
-            if (activityRecognitionGranted && sensorAvailable) refreshSteps()
+            refreshSteps()
         }
         viewModelScope.launch { fetchWeatherIfNeeded(today) }
     }
@@ -125,13 +125,16 @@ class HomeViewModel @Inject constructor(
         val today = LocalDate.now()
         viewModelScope.launch {
             _uiState.update { it.copy(isLoadingSteps = true, errorMessage = null) }
+            // 権限状態を最新化してから判定（起動直後の競合状態を防ぐ）
+            syncPermissionState()
             val useSensor = _uiState.value.activityRecognitionGranted && _uiState.value.sensorAvailable
+            // HC を優先：他アプリ（OPPOヘルス等）が書いたデータも集約されるため
             // 読み取り失敗時は null。0 で DB を上書きしてデータを失わないようにする
             val steps: Int? = when {
-                useSensor ->
-                    runCatching { stepSensorManager.readTodaySteps() }.getOrNull()
                 _uiState.value.healthConnectPermissionGranted ->
                     runCatching { healthConnect.readSteps(today) }.getOrNull()
+                useSensor ->
+                    runCatching { stepSensorManager.readTodaySteps() }.getOrNull()
                 else -> {
                     _uiState.update { it.copy(isLoadingSteps = false) }
                     return@launch
@@ -139,10 +142,6 @@ class HomeViewModel @Inject constructor(
             }
             if (steps != null) {
                 runCatching { repository.saveSteps(today, steps) }
-                // センサー由来の歩数を Health Connect に書き戻す（連携済みのとき）
-                if (useSensor && _uiState.value.healthConnectPermissionGranted) {
-                    runCatching { healthConnect.writeSteps(today, steps) }
-                }
             }
             _uiState.update { it.copy(isLoadingSteps = false) }
         }
