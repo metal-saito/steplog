@@ -44,14 +44,17 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.health.connect.client.PermissionController
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import com.cellomsai.steplog.ui.components.BodyConditionInput
 import com.cellomsai.steplog.ui.components.StepsDisplay
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -68,6 +71,31 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
         viewModel.onActivityRecognitionResult(granted)
+    }
+
+    // Health Connect パーミッションリクエストランチャー
+    val requestHealthConnect = rememberLauncherForActivityResult(
+        contract = PermissionController.createRequestPermissionResultContract()
+    ) { granted ->
+        viewModel.onPermissionsResult(granted)
+    }
+
+    // 初回起動などで未連携なら Health Connect 権限リクエストを自動起動
+    LaunchedEffect(uiState.shouldRequestHealthConnect) {
+        if (uiState.shouldRequestHealthConnect) {
+            viewModel.onHealthConnectRequestConsumed()
+            runCatching { requestHealthConnect.launch(viewModel.healthConnect.permissions) }
+        }
+    }
+
+    // 画面表示中は数秒ごとに歩数を静かに更新（リアルタイム反映）
+    LaunchedEffect(lifecycleOwner) {
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            while (true) {
+                delay(4000)
+                viewModel.refreshSteps(showLoading = false)
+            }
+        }
     }
 
     // 位置情報パーミッションリクエストランチャー（気圧取得用）

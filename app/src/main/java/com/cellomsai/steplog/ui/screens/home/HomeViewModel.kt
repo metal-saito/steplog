@@ -32,6 +32,7 @@ data class HomeUiState(
     val errorMessage: String? = null,
     val activityRecognitionGranted: Boolean = false,
     val sensorAvailable: Boolean = false,
+    val shouldRequestHealthConnect: Boolean = false,
 )
 
 @HiltViewModel
@@ -71,6 +72,11 @@ class HomeViewModel @Inject constructor(
 
         viewModelScope.launch {
             syncPermissionState()
+            // 初回起動時など未連携なら Health Connect の権限リクエストを促す
+            val s = _uiState.value
+            if (s.healthConnectAvailable && !s.healthConnectPermissionGranted) {
+                _uiState.update { it.copy(shouldRequestHealthConnect = true) }
+            }
             refreshSteps()
         }
         viewModelScope.launch { fetchWeatherIfNeeded(today) }
@@ -117,33 +123,49 @@ class HomeViewModel @Inject constructor(
         refreshSteps()
     }
 
+    // Health Connect の権限リクエストを起動したら呼ぶ（多重起動防止）
+    fun onHealthConnectRequestConsumed() {
+        _uiState.update { it.copy(shouldRequestHealthConnect = false) }
+    }
+
     fun onLocationPermissionGranted() {
         viewModelScope.launch { fetchWeatherIfNeeded(LocalDate.now()) }
     }
 
-    fun refreshSteps() {
+    /**
+     * 当日歩数を再取得して保存する。
+     * @param showLoading 引っ張り更新などユーザー操作時は true。定期ポーリング時は false にして
+     *   スピナーの点滅を防ぐ（DB 経由で歩数だけ静かに更新される）。
+     */
+    fun refreshSteps(showLoading: Boolean = true) {
         val today = LocalDate.now()
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoadingSteps = true, errorMessage = null) }
-            // 権限状態を最新化してから判定（起動直後の競合状態を防ぐ）
-            syncPermissionState()
+            if (showLoading) {
+                _uiState.update { it.copy(isLoadingSteps = true, errorMessage = null) }
+                // 権限状態を最新化してから判定（起動直後の競合状態を防ぐ）。
+                // 定期ポーリング時は init/onResume で同期済みの状態を流用する。
+                syncPermissionState()
+            }
             val useSensor = _uiState.value.activityRecognitionGranted && _uiState.value.sensorAvailable
-            // HC を優先：他アプリ（OPPOヘルス等）が書いたデータも集約されるため
+            // HC は他アプリ（OPPOヘルス等）の集計も含むが反映が遅れることがある。
+            // センサーがあればそれを起点（seed）にしてリアルタイムに差分加算する。
+            val hcSteps: Int? = if (_uiState.value.healthConnectPermissionGranted) {
+                runCatching { healthConnect.readSteps(today) }.getOrNull()
+            } else null
             // 読み取り失敗時は null。0 で DB を上書きしてデータを失わないようにする
             val steps: Int? = when {
-                _uiState.value.healthConnectPermissionGranted ->
-                    runCatching { healthConnect.readSteps(today) }.getOrNull()
                 useSensor ->
-                    runCatching { stepSensorManager.readTodaySteps() }.getOrNull()
+                    runCatching { stepSensorManager.readTodaySteps(seedSteps = hcSteps ?: 0) }.getOrNull()
+                _uiState.value.healthConnectPermissionGranted -> hcSteps
                 else -> {
-                    _uiState.update { it.copy(isLoadingSteps = false) }
+                    if (showLoading) _uiState.update { it.copy(isLoadingSteps = false) }
                     return@launch
                 }
             }
             if (steps != null) {
                 runCatching { repository.saveSteps(today, steps) }
             }
-            _uiState.update { it.copy(isLoadingSteps = false) }
+            if (showLoading) _uiState.update { it.copy(isLoadingSteps = false) }
         }
     }
 

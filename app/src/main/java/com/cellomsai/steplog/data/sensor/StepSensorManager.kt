@@ -54,18 +54,21 @@ class StepSensorManager @Inject constructor(
      * - 再起動時: current < lastSensor → センサーが 0 にリセットされたので current 自体を加算
      * これにより端末再起動・アプリ終了をまたいでも、記録済みの当日歩数が減ることはない。
      *
-     * 読み取りに失敗した場合は保存済みの当日累計を返す（0 で上書きしない）。
+     * @param seedSteps 当日の起点歩数（Health Connect 由来）。アプリ起動前に歩いた分を
+     *   取りこぼさないよう、新しい日の初期値にこれを用い、以降も下限（floor）として扱う。
+     *
+     * 読み取りに失敗した場合は保存済みの当日累計（seedSteps を下回らない）を返す。
      */
-    suspend fun readTodaySteps(): Int = mutex.withLock {
+    suspend fun readTodaySteps(seedSteps: Int = 0): Int = mutex.withLock {
         val today = LocalDate.now().toString()
         val state = userPreferences.getStepState()
         val current = readCurrentCount()
-            ?: return@withLock if (state.date == today) state.dailyTotal else 0
+            ?: return@withLock if (state.date == today) maxOf(state.dailyTotal, seedSteps) else seedSteps
 
         if (state.date != today) {
-            // 新しい日：当日の起点を記録して 0 から開始
-            userPreferences.setStepState(today, current, 0)
-            return@withLock 0
+            // 新しい日：HC の当日歩数を起点に設定して計測開始
+            userPreferences.setStepState(today, current, seedSteps)
+            return@withLock seedSteps
         }
 
         val delta = if (current >= state.lastSensor) {
@@ -74,7 +77,8 @@ class StepSensorManager @Inject constructor(
             // 再起動でセンサーがリセットされた：current が再起動後の歩数
             current
         }
-        val newTotal = state.dailyTotal + delta.toInt()
+        // HC 値（他アプリの集計）を下回らないよう floor を取る
+        val newTotal = maxOf(state.dailyTotal + delta.toInt(), seedSteps)
         userPreferences.setStepState(today, current, newTotal)
         newTotal
     }
