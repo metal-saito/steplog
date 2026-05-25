@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.StepsRecord
+import androidx.health.connect.client.records.metadata.Metadata
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -62,6 +63,7 @@ class HealthConnectManager @Inject constructor(
             startZoneOffset = start.offset,
             endTime = end.toInstant(),
             endZoneOffset = end.offset,
+            metadata = Metadata.manualEntry(),
         )
         client().insertRecords(listOf(record))
     }
