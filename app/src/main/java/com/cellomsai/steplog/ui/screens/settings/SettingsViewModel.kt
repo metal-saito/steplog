@@ -3,6 +3,7 @@ package com.cellomsai.steplog.ui.screens.settings
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.cellomsai.steplog.data.healthconnect.HealthConnectManager
 import com.cellomsai.steplog.data.preferences.UserPreferences
 import com.cellomsai.steplog.data.repository.DailyRecordRepository
 import com.cellomsai.steplog.ui.theme.AppTheme
@@ -22,12 +23,15 @@ data class SettingsUiState(
     val weatherApiKey: String = "",
     val message: String? = null,
     val csvFile: File? = null,
+    val healthConnectAvailable: Boolean = false,
+    val healthConnectConnected: Boolean = false,
 )
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val repository: DailyRecordRepository,
     private val userPreferences: UserPreferences,
+    val healthConnect: HealthConnectManager,
     @ApplicationContext private val context: Context,
 ) : ViewModel() {
 
@@ -43,6 +47,29 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             userPreferences.weatherApiKey.collect { key ->
                 _uiState.update { it.copy(weatherApiKey = key) }
+            }
+        }
+        refreshHealthConnectState()
+    }
+
+    fun refreshHealthConnectState() {
+        val available = healthConnect.isAvailable()
+        _uiState.update { it.copy(healthConnectAvailable = available) }
+        if (!available) return
+        viewModelScope.launch {
+            val connected = runCatching { healthConnect.hasPermissions() }.getOrDefault(false)
+            _uiState.update { it.copy(healthConnectConnected = connected) }
+        }
+    }
+
+    fun onHealthConnectPermissionsResult() {
+        viewModelScope.launch {
+            val connected = runCatching { healthConnect.hasPermissions() }.getOrDefault(false)
+            _uiState.update {
+                it.copy(
+                    healthConnectConnected = connected,
+                    message = if (connected) "Health Connect と連携しました" else "連携が許可されませんでした",
+                )
             }
         }
     }

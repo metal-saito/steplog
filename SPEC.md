@@ -229,8 +229,9 @@ Domain / Data Layer
 | `ACTIVITY_RECOGNITION` | 必須 | 歩数センサー読み取り（Android 10+） |
 | `ACCESS_COARSE_LOCATION` | 任意 | 気圧取得のための位置情報 |
 | `INTERNET` | 必須 | OpenWeatherMap API 通信 |
-| `health.READ_STEPS` | 任意 | Health Connect フォールバック |
-| `health.READ_TOTAL_CALORIES_BURNED` | 任意 | Health Connect フォールバック |
+| `health.READ_STEPS` | 任意 | Health Connect から歩数を読む |
+| `health.WRITE_STEPS` | 任意 | Health Connect へ歩数を書き込む |
+| `health.READ_TOTAL_CALORIES_BURNED` | 任意 | Health Connect 連携 |
 | `POST_NOTIFICATIONS` | 任意 | 将来的な朝リマインダー用（未実装） |
 | `RECEIVE_BOOT_COMPLETED` | 任意 | 将来的な WorkManager 用（未実装） |
 
@@ -274,10 +275,17 @@ Domain / Data Layer
   3. `getLastKnownLocation(PASSIVE_PROVIDER)`
   4. `requestSingleUpdate`（5 秒タイムアウト）
 
-### Health Connect（フォールバック）
+### Health Connect（書き込み＋読み込み）
 
-- `TYPE_STEP_COUNTER` センサーが利用不可の端末のみ使用
-- `PermissionsRationaleActivity` を `ACTION_SHOW_PERMISSIONS_RATIONALE` で登録（HC アプリ一覧への表示に必須）
+- **連携方法**: 設定 → 「Health Connect 連携」→ `PermissionController.createRequestPermissionResultContract()` で正式に権限リクエスト。これにより StepLog が HC の接続アプリ一覧に登録される。
+- **書き込み**: センサーで計測した当日歩数を、`refreshSteps()` のたびに HC へ書き込む（`writeSteps`）。
+  - 自アプリが過去に書いた当日記録を `deleteRecords`（時間範囲）で削除してから 1 件挿入し、二重計上を防止（HC ではアプリは自分が書いた記録のみ削除可能）。
+  - これにより Google Fit 等の書き込み元が無くても HC に歩数が必ず存在し、他のヘルスアプリと共有できる。
+- **読み込み**: センサーが利用不可の端末では HC から歩数を読む（フォールバック）。
+- **アプリ発見性**: `PermissionsRationaleActivity` を登録。
+  - Android 13 以下: `androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE`
+  - Android 14 以上: `android.intent.action.VIEW_PERMISSION_USAGE` + `category.HEALTH_PERMISSIONS`
+- **端末互換**: contract 起動に失敗する端末向けに、HC 設定画面（`ACTION_HEALTH_CONNECT_SETTINGS`）を開くフォールバックを用意。
 
 ---
 

@@ -3,6 +3,7 @@
 
     <!-- Health Connect permissions -->
     <uses-permission android:name="android.permission.health.READ_STEPS" />
+    <uses-permission android:name="android.permission.health.WRITE_STEPS" />
     <uses-permission android:name="android.permission.health.READ_TOTAL_CALORIES_BURNED" />
 
     <!-- Location for weather (coarse is sufficient) -->
@@ -43,8 +44,14 @@
         <activity
             android:name=".PermissionsRationaleActivity"
             android:exported="true">
+            <!-- Android 13 以下 / Health Connect アプリ経由 -->
             <intent-filter>
                 <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+            </intent-filter>
+            <!-- Android 14 以上 / システム統合版 Health Connect -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+                <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
             </intent-filter>
         </activity>
 

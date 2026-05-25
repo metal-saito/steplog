@@ -125,9 +125,10 @@ class HomeViewModel @Inject constructor(
         val today = LocalDate.now()
         viewModelScope.launch {
             _uiState.update { it.copy(isLoadingSteps = true, errorMessage = null) }
+            val useSensor = _uiState.value.activityRecognitionGranted && _uiState.value.sensorAvailable
             // 読み取り失敗時は null。0 で DB を上書きしてデータを失わないようにする
             val steps: Int? = when {
-                _uiState.value.activityRecognitionGranted && _uiState.value.sensorAvailable ->
+                useSensor ->
                     runCatching { stepSensorManager.readTodaySteps() }.getOrNull()
                 _uiState.value.healthConnectPermissionGranted ->
                     runCatching { healthConnect.readSteps(today) }.getOrNull()
@@ -138,6 +139,10 @@ class HomeViewModel @Inject constructor(
             }
             if (steps != null) {
                 runCatching { repository.saveSteps(today, steps) }
+                // センサー由来の歩数を Health Connect に書き戻す（連携済みのとき）
+                if (useSensor && _uiState.value.healthConnectPermissionGranted) {
+                    runCatching { healthConnect.writeSteps(today, steps) }
+                }
             }
             _uiState.update { it.copy(isLoadingSteps = false) }
         }

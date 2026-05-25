@@ -9,6 +9,7 @@ import androidx.health.connect.client.time.TimeRangeFilter
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.ZonedDateTime
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -18,6 +19,7 @@ class HealthConnectManager @Inject constructor(
 ) {
     val permissions = setOf(
         HealthPermission.getReadPermission(StepsRecord::class),
+        HealthPermission.getWritePermission(StepsRecord::class),
     )
 
     fun isAvailable(): Boolean =
@@ -28,6 +30,40 @@ class HealthConnectManager @Inject constructor(
     suspend fun hasPermissions(): Boolean {
         if (!isAvailable()) return false
         return client().permissionController.getGrantedPermissions().containsAll(permissions)
+    }
+
+    /**
+     * 当日の歩数を Health Connect に書き込む。
+     * 自アプリが過去に書いた当日の記録を削除してから 1 件挿入し、二重計上を防ぐ。
+     * （HC ではアプリは自分が書いた記録のみ削除できる）
+     */
+    suspend fun writeSteps(date: LocalDate, count: Int) {
+        if (count <= 0 || !isAvailable()) return
+        if (!hasPermissions()) return
+
+        val zone = ZoneId.systemDefault()
+        val start = date.atStartOfDay(zone)
+        val end = if (date == LocalDate.now()) {
+            ZonedDateTime.now(zone)
+        } else {
+            date.plusDays(1).atStartOfDay(zone)
+        }
+        if (!end.isAfter(start)) return
+
+        runCatching {
+            client().deleteRecords(
+                StepsRecord::class,
+                TimeRangeFilter.between(start.toInstant(), end.toInstant()),
+            )
+        }
+        val record = StepsRecord(
+            count = count.toLong(),
+            startTime = start.toInstant(),
+            startZoneOffset = start.offset,
+            endTime = end.toInstant(),
+            endZoneOffset = end.offset,
+        )
+        client().insertRecords(listOf(record))
     }
 
     suspend fun readSteps(date: LocalDate): Int {
