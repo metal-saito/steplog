@@ -33,6 +33,7 @@ class DailyRecordRepository @Inject constructor(
         dizzinessLevel: Int?,
         fatigueLevel: Int?,
         sleepHours: Float?,
+        weightKg: Float?,
         memo: String?,
     ) {
         val now = System.currentTimeMillis()
@@ -42,6 +43,7 @@ class DailyRecordRepository @Inject constructor(
             fatigue = fatigueLevel,
             sleep = sleepHours,
             memo = memo,
+            weightKg = weightKg,
             updatedAt = now,
         )
         if (updated == 0) dao.upsert(
@@ -51,6 +53,7 @@ class DailyRecordRepository @Inject constructor(
                 fatigueLevel = fatigueLevel,
                 sleepHours = sleepHours,
                 memo = memo,
+                weightKg = weightKg,
             )
         )
     }

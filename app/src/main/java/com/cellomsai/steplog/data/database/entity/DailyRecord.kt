@@ -12,6 +12,7 @@ data class DailyRecord(
     val sleepHours: Float? = null,          // 0.0-12.0
     val pressure: Float? = null,            // morning pressure in hPa
     val memo: String? = null,
+    val weightKg: Float? = null,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
 )

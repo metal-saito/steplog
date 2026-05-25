@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -74,6 +75,7 @@ fun DetailScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
                 .verticalScroll(rememberScrollState())
+                .imePadding()
                 .padding(horizontal = 20.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
@@ -83,10 +85,11 @@ fun DetailScreen(
                 initialDizziness = uiState.record?.dizzinessLevel,
                 initialFatigue = uiState.record?.fatigueLevel,
                 initialSleepHours = uiState.record?.sleepHours ?: 7f,
+                initialWeightKg = uiState.record?.weightKg,
                 initialMemo = uiState.record?.memo ?: "",
                 isSaving = uiState.isSaving,
-                onSave = { dizziness, fatigue, sleep, memo ->
-                    viewModel.save(dizziness, fatigue, sleep, memo)
+                onSave = { dizziness, fatigue, sleep, weightKg, memo ->
+                    viewModel.save(dizziness, fatigue, sleep, weightKg, memo)
                 },
             )
 

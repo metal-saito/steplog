@@ -29,16 +29,19 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.cellomsai.steplog.ui.theme.ConditionColors
 import java.text.NumberFormat
+import java.time.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -119,6 +122,52 @@ fun GraphScreen(viewModel: GraphViewModel = hiltViewModel()) {
                             .fillMaxWidth()
                             .height(120.dp),
                     )
+                }
+
+                // 体重グラフ
+                val today = remember { LocalDate.now() }
+                val allDates = remember(uiState.range) {
+                    (0 until uiState.range.days).map {
+                        today.minusDays((uiState.range.days - 1 - it).toLong())
+                    }
+                }
+                val recordsByDate = remember(uiState.records) {
+                    uiState.records.associateBy { it.date }
+                }
+                val weightPoints = remember(allDates, recordsByDate) {
+                    allDates.mapIndexedNotNull { i, date ->
+                        val w = recordsByDate[date.toString()]?.weightKg
+                        if (w != null) i to w else null
+                    }
+                }
+
+                ChartCard(title = "体重（kg）") {
+                    if (weightPoints.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(120.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = "体重データなし",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    } else {
+                        val lineColor = MaterialTheme.colorScheme.tertiary
+                        val dotColor = MaterialTheme.colorScheme.tertiary
+                        WeightLineChart(
+                            points = weightPoints,
+                            totalDays = uiState.range.days,
+                            lineColor = lineColor,
+                            dotColor = dotColor,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(120.dp),
+                        )
+                    }
                 }
 
                 // 体調グラフ
@@ -211,6 +260,58 @@ private fun StepsBarChart(
                 color = if (s > 0) barColor.copy(alpha = 0.75f) else emptyColor,
                 topLeft = Offset(left, size.height - barHeight),
                 size = Size(barWidth, barHeight),
+            )
+        }
+    }
+}
+
+/**
+ * Line chart for weight data. Draws segments between consecutive non-null points,
+ * skipping gaps where no data was recorded.
+ *
+ * @param points list of (dateIndex, weightKg) for days that have weight data
+ * @param totalDays total number of days in the displayed range (x-axis span)
+ */
+@Composable
+private fun WeightLineChart(
+    points: List<Pair<Int, Float>>,
+    totalDays: Int,
+    lineColor: Color,
+    dotColor: Color,
+    modifier: Modifier = Modifier,
+) {
+    Canvas(modifier = modifier) {
+        if (points.isEmpty()) return@Canvas
+
+        val minWeight = points.minOf { it.second }
+        val maxWeight = points.maxOf { it.second }
+        val weightRange = (maxWeight - minWeight).coerceAtLeast(1f)
+
+        fun xOf(index: Int) = if (totalDays <= 1) size.width / 2f
+            else (index.toFloat() / (totalDays - 1)) * size.width
+
+        fun yOf(weight: Float) = size.height - ((weight - minWeight) / weightRange) * size.height * 0.85f - size.height * 0.075f
+
+        // draw line segments between consecutive recorded points
+        for (i in 0 until points.size - 1) {
+            val (idxA, wA) = points[i]
+            val (idxB, wB) = points[i + 1]
+            drawLine(
+                color = lineColor.copy(alpha = 0.8f),
+                start = Offset(xOf(idxA), yOf(wA)),
+                end = Offset(xOf(idxB), yOf(wB)),
+                strokeWidth = 3.dp.toPx(),
+                cap = StrokeCap.Round,
+            )
+        }
+
+        // draw dots at each data point
+        val dotRadius = 4.dp.toPx()
+        points.forEach { (idx, w) ->
+            drawCircle(
+                color = dotColor,
+                radius = dotRadius,
+                center = Offset(xOf(idx), yOf(w)),
             )
         }
     }

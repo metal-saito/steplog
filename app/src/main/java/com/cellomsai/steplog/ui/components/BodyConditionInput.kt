@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -30,6 +31,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringArrayResource
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.cellomsai.steplog.R
@@ -41,9 +43,10 @@ fun BodyConditionInput(
     initialDizziness: Int?,
     initialFatigue: Int?,
     initialSleepHours: Float,
+    initialWeightKg: Float?,
     initialMemo: String,
     isSaving: Boolean,
-    onSave: (dizziness: Int?, fatigue: Int?, sleepHours: Float?, memo: String?) -> Unit,
+    onSave: (dizziness: Int?, fatigue: Int?, sleepHours: Float?, weightKg: Float?, memo: String?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val conditionLabels = stringArrayResource(R.array.condition_labels)
@@ -51,6 +54,9 @@ fun BodyConditionInput(
     var dizziness by rememberSaveable(initialDizziness) { mutableStateOf(initialDizziness) }
     var fatigue by rememberSaveable(initialFatigue) { mutableStateOf(initialFatigue) }
     var sleepHours by rememberSaveable(initialSleepHours) { mutableFloatStateOf(initialSleepHours) }
+    var weightText by rememberSaveable(initialWeightKg) {
+        mutableStateOf(initialWeightKg?.let { "%.1f".format(it) } ?: "")
+    }
     var memo by rememberSaveable(initialMemo) { mutableStateOf(initialMemo) }
 
     Card(
@@ -112,6 +118,24 @@ fun BodyConditionInput(
             }
 
             OutlinedTextField(
+                value = weightText,
+                onValueChange = { input ->
+                    // allow only digits and one decimal point, max 3 digits before decimal
+                    val filtered = input.filter { it.isDigit() || it == '.' }
+                    if (filtered.count { it == '.' } <= 1) weightText = filtered
+                },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("体重（kg）") },
+                placeholder = { Text("例：65.0") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                ),
+            )
+
+            OutlinedTextField(
                 value = memo,
                 onValueChange = { memo = it },
                 modifier = Modifier.fillMaxWidth(),
@@ -126,7 +150,7 @@ fun BodyConditionInput(
 
             Button(
                 onClick = {
-                    onSave(dizziness, fatigue, sleepHours, memo.ifBlank { null })
+                    onSave(dizziness, fatigue, sleepHours, weightText.toFloatOrNull(), memo.ifBlank { null })
                 },
                 enabled = !isSaving,
                 modifier = Modifier.fillMaxWidth(),
@@ -177,9 +201,10 @@ private fun BodyConditionInputPreview() {
             initialDizziness = null,
             initialFatigue = null,
             initialSleepHours = 7f,
+            initialWeightKg = null,
             initialMemo = "",
             isSaving = false,
-            onSave = { _, _, _, _ -> },
+            onSave = { _, _, _, _, _ -> },
         )
     }
 }

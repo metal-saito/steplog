@@ -173,13 +173,14 @@ class HomeViewModel @Inject constructor(
         dizzinessLevel: Int?,
         fatigueLevel: Int?,
         sleepHours: Float?,
+        weightKg: Float?,
         memo: String?,
     ) {
         val today = LocalDate.now()
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true, errorMessage = null) }
             runCatching {
-                repository.saveBodyCondition(today, dizzinessLevel, fatigueLevel, sleepHours, memo)
+                repository.saveBodyCondition(today, dizzinessLevel, fatigueLevel, sleepHours, weightKg, memo)
             }.onSuccess {
                 _uiState.update { it.copy(isSaving = false, savedToastVisible = true) }
             }.onFailure {

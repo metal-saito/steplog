@@ -39,7 +39,7 @@ interface DailyRecordDao {
     @Query("""
         UPDATE daily_records
         SET dizzinessLevel = :dizziness, fatigueLevel = :fatigue,
-            sleepHours = :sleep, memo = :memo, updatedAt = :updatedAt
+            sleepHours = :sleep, memo = :memo, weightKg = :weightKg, updatedAt = :updatedAt
         WHERE date = :date
     """)
     suspend fun updateBodyCondition(
@@ -48,6 +48,7 @@ interface DailyRecordDao {
         fatigue: Int?,
         sleep: Float?,
         memo: String?,
+        weightKg: Float?,
         updatedAt: Long,
     ): Int
 

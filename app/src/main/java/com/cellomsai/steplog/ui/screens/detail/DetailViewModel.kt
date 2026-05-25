@@ -50,12 +50,12 @@ class DetailViewModel @Inject constructor(
         }
     }
 
-    fun save(dizziness: Int?, fatigue: Int?, sleepHours: Float?, memo: String?) {
+    fun save(dizziness: Int?, fatigue: Int?, sleepHours: Float?, weightKg: Float?, memo: String?) {
         val date = currentDate ?: return
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true) }
             runCatching {
-                repository.saveBodyCondition(date, dizziness, fatigue, sleepHours, memo)
+                repository.saveBodyCondition(date, dizziness, fatigue, sleepHours, weightKg, memo)
             }.onSuccess {
                 _uiState.update { it.copy(isSaving = false, savedToastVisible = true) }
             }.onFailure {
