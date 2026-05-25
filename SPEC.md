@@ -134,23 +134,42 @@ BottomNavigationBar
 |------|----|-----------|------|
 | `theme` | String | `"SYSTEM"` | `SYSTEM` / `LIGHT` / `DARK` |
 | `weather_api_key` | String | プリセット済み | OpenWeatherMap API キー |
-| `step_baseline_date` | String | `""` | ベースライン計測日 |
-| `step_baseline_count` | Long | 0 | ベースライン歩数センサー値 |
+| `step_date` | String | `""` | 歩数計測中の日付 |
+| `step_last_sensor` | Long | 0 | 最後に処理した累計センサー値（再起動検知用） |
+| `step_daily_total` | Int | 0 | 当日のここまでの累計歩数 |
 
-### 3.3 歩数ベースライン方式
+### 3.3 歩数の差分蓄積方式（再起動・終了に強い）
 
-`TYPE_STEP_COUNTER` センサーは起動からの累計値を返すため、日次歩数をベースライン差分で計算する。
+`TYPE_STEP_COUNTER` センサーは**端末起動からの累計値**を返し、**端末再起動で 0 にリセット**される。
+そのため「最後に見たセンサー値」と「当日累計」を保持し、差分を加算していく方式を採用する。
 
 ```
-1. 初回読み取り時（当日のベースラインなし）:
-   → baseline = currentCount, 返値 = 0
+読み取りごと (readTodaySteps):
+1. 日付が変わった（state.date != today）:
+   → state = (today, current, 0), 返値 = 0  （新しい日の起点）
 
-2. 以降の読み取り:
-   → 返値 = currentCount - baseline
+2. 通常時（current >= lastSensor）:
+   → delta = current - lastSensor
+   → dailyTotal += delta
+   → state = (today, current, dailyTotal), 返値 = dailyTotal
 
-3. 再起動検知（currentCount < baseline）:
-   → baseline を currentCount にリセット, 返値 = 0
+3. 再起動検知（current < lastSensor）:
+   → delta = current  （current 自体が再起動後の歩数）
+   → dailyTotal += delta   ← リセットせず加算
+   → state = (today, current, dailyTotal), 返値 = dailyTotal
+
+4. センサー読み取り失敗:
+   → 当日なら保存済み dailyTotal を返す（0 で上書きしない）
 ```
+
+- **当日累計は減らない**ため、アプリ終了・端末再起動をまたいでも記録済み歩数が消えない。
+- read-modify-write は `Mutex` で直列化し、並列呼び出しによる二重加算を防止。
+- `refreshSteps()` は読み取り失敗（null）時に DB を保存しない（0 上書き防止）。
+
+**既知の制約:** アプリを完全終了したまま歩き、その途中で端末を再起動した場合、
+「最後の読み取り〜再起動」間の歩数は復元できない（センサーがリセットされ、
+バックグラウンドで読み取っていないため）。完全な常時計測が必要な場合は
+Health Connect 連携または前面サービスが必要。
 
 ---
 

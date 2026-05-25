@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -19,6 +20,18 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(na
 
 private const val DEFAULT_WEATHER_API_KEY = "a27dcc491ad3f394cd83b84b910a2931"
 
+/**
+ * 歩数センサー（TYPE_STEP_COUNTER）の蓄積状態。
+ * @param date 計測中の日付（yyyy-MM-dd）
+ * @param lastSensor 最後に処理した累計センサー値（再起動検知用）
+ * @param dailyTotal 当日のここまでの累計歩数（表示・DB保存の元値）
+ */
+data class StepState(
+    val date: String,
+    val lastSensor: Long,
+    val dailyTotal: Int,
+)
+
 @Singleton
 class UserPreferences @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -26,8 +39,9 @@ class UserPreferences @Inject constructor(
     private object Keys {
         val THEME = stringPreferencesKey("theme")
         val WEATHER_API_KEY = stringPreferencesKey("weather_api_key")
-        val STEP_BASELINE_DATE = stringPreferencesKey("step_baseline_date")
-        val STEP_BASELINE_COUNT = longPreferencesKey("step_baseline_count")
+        val STEP_DATE = stringPreferencesKey("step_date")
+        val STEP_LAST_SENSOR = longPreferencesKey("step_last_sensor")
+        val STEP_DAILY_TOTAL = intPreferencesKey("step_daily_total")
     }
 
     val appTheme: Flow<AppTheme> = context.dataStore.data.map { prefs ->
@@ -50,17 +64,20 @@ class UserPreferences @Inject constructor(
         context.dataStore.edit { it[Keys.WEATHER_API_KEY] = key }
     }
 
-    suspend fun getStepBaseline(): Pair<String, Long> {
+    suspend fun getStepState(): StepState {
         val prefs = context.dataStore.data.first()
-        val date = prefs[Keys.STEP_BASELINE_DATE] ?: ""
-        val count = prefs[Keys.STEP_BASELINE_COUNT] ?: 0L
-        return Pair(date, count)
+        return StepState(
+            date = prefs[Keys.STEP_DATE] ?: "",
+            lastSensor = prefs[Keys.STEP_LAST_SENSOR] ?: 0L,
+            dailyTotal = prefs[Keys.STEP_DAILY_TOTAL] ?: 0,
+        )
     }
 
-    suspend fun setStepBaseline(date: String, count: Long) {
+    suspend fun setStepState(date: String, lastSensor: Long, dailyTotal: Int) {
         context.dataStore.edit { prefs ->
-            prefs[Keys.STEP_BASELINE_DATE] = date
-            prefs[Keys.STEP_BASELINE_COUNT] = count
+            prefs[Keys.STEP_DATE] = date
+            prefs[Keys.STEP_LAST_SENSOR] = lastSensor
+            prefs[Keys.STEP_DAILY_TOTAL] = dailyTotal
         }
     }
 }
