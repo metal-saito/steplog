@@ -375,19 +375,25 @@ private fun LineChart(
             fun yOf(value: Float) =
                 size.height - ((value - minValue) / range) * size.height * 0.85f - size.height * 0.075f
 
-            // 記録のある点同士だけを線でつなぐ（欠損日はまたいでつなぐ）
-            clipRect(right = clipWidth) {
-                for (i in 0 until points.size - 1) {
-                    val (idxA, vA) = points[i]
-                    val (idxB, vB) = points[i + 1]
-                    drawLine(
-                        color = lineColor.copy(alpha = 0.8f),
-                        start = Offset(xOf(idxA), yOf(vA)),
-                        end = Offset(xOf(idxB), yOf(vB)),
-                        strokeWidth = 3.dp.toPx(),
-                        cap = StrokeCap.Round,
-                    )
-                }
+            // 記録のある点同士だけを線でつなぐ。アニメーション中は clipWidth で線を途中でカット。
+            for (i in 0 until points.size - 1) {
+                val (idxA, vA) = points[i]
+                val (idxB, vB) = points[i + 1]
+                val xA = xOf(idxA)
+                val yA = yOf(vA)
+                val xB = xOf(idxB)
+                val yB = yOf(vB)
+                if (xA > clipWidth) continue
+                val endX = xB.coerceAtMost(clipWidth)
+                val t = if (xB > xA) (endX - xA) / (xB - xA) else 1f
+                val endY = yA + (yB - yA) * t
+                drawLine(
+                    color = lineColor.copy(alpha = 0.8f),
+                    start = Offset(xA, yA),
+                    end = Offset(endX, endY),
+                    strokeWidth = 3.dp.toPx(),
+                    cap = StrokeCap.Round,
+                )
             }
 
             val dotRadius = 4.dp.toPx()
