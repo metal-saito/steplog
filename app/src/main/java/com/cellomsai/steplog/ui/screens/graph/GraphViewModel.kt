@@ -21,6 +21,28 @@ enum class GraphRange(val days: Int, val label: String) {
     THREE_MONTHS(90, "90日"),
 }
 
+/**
+ * 気圧と不調スコアの相関。不調スコア = (めまい度 + 疲労度) / 2 (0=良好, 5=最悪)。
+ * 閾値以下を低気圧、以上を高気圧と分類して平均不調スコアを比較する。
+ */
+data class CorrelationInsight(
+    val totalPoints: Int,
+    val lowPressureDays: Int,
+    val highPressureDays: Int,
+    val lowPressureAvgBadness: Float,
+    val highPressureAvgBadness: Float,
+    val threshold: Float = 1005f,
+) {
+    val diff: Float get() = lowPressureAvgBadness - highPressureAvgBadness
+
+    val summaryText: String
+        get() = when {
+            diff > 0.5f -> "低気圧の日は不調スコアが %.1f 高い傾向があります".format(diff)
+            diff < -0.5f -> "高気圧の日のほうが不調になりやすい傾向があります"
+            else -> "気圧と体調の明確な相関は今のところ見られません"
+        }
+}
+
 data class GraphUiState(
     val range: GraphRange = GraphRange.MONTH,
     val records: List<DailyRecord> = emptyList(),
@@ -32,6 +54,33 @@ data class GraphUiState(
 
     val recordedDays: Int
         get() = records.count { it.dizzinessLevel != null || it.fatigueLevel != null }
+
+    val correlationInsight: CorrelationInsight?
+        get() {
+            val threshold = 1005f
+            val points = records.mapNotNull { r ->
+                val pressure = r.pressure ?: return@mapNotNull null
+                val badness = when {
+                    r.dizzinessLevel != null && r.fatigueLevel != null ->
+                        (r.dizzinessLevel + r.fatigueLevel) / 2f
+                    r.dizzinessLevel != null -> r.dizzinessLevel.toFloat()
+                    r.fatigueLevel != null -> r.fatigueLevel.toFloat()
+                    else -> return@mapNotNull null
+                }
+                pressure to badness
+            }
+            if (points.size < 5) return null
+            val low = points.filter { it.first < threshold }
+            val high = points.filter { it.first >= threshold }
+            if (low.isEmpty() || high.isEmpty()) return null
+            return CorrelationInsight(
+                totalPoints = points.size,
+                lowPressureDays = low.size,
+                highPressureDays = high.size,
+                lowPressureAvgBadness = low.map { it.second }.average().toFloat(),
+                highPressureAvgBadness = high.map { it.second }.average().toFloat(),
+            )
+        }
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)

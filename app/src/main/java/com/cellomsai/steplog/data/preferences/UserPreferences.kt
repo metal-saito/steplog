@@ -3,6 +3,7 @@ package com.cellomsai.steplog.data.preferences
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
@@ -42,6 +43,7 @@ class UserPreferences @Inject constructor(
         val STEP_DATE = stringPreferencesKey("step_date")
         val STEP_LAST_SENSOR = longPreferencesKey("step_last_sensor")
         val STEP_DAILY_TOTAL = intPreferencesKey("step_daily_total")
+        val ONBOARDING_DONE = booleanPreferencesKey("onboarding_done")
     }
 
     val appTheme: Flow<AppTheme> = context.dataStore.data.map { prefs ->
@@ -56,12 +58,20 @@ class UserPreferences @Inject constructor(
         prefs[Keys.WEATHER_API_KEY] ?: DEFAULT_WEATHER_API_KEY
     }
 
+    val onboardingDone: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[Keys.ONBOARDING_DONE] ?: false
+    }
+
     suspend fun setAppTheme(theme: AppTheme) {
         context.dataStore.edit { it[Keys.THEME] = theme.name }
     }
 
     suspend fun setWeatherApiKey(key: String) {
         context.dataStore.edit { it[Keys.WEATHER_API_KEY] = key }
+    }
+
+    suspend fun setOnboardingDone() {
+        context.dataStore.edit { it[Keys.ONBOARDING_DONE] = true }
     }
 
     suspend fun getStepState(): StepState {

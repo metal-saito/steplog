@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">StepLog</string>
+    <string name="app_name">気圧ノート</string>
 
     <!-- Bottom Navigation -->
     <string name="nav_today">今日</string>
@@ -49,7 +49,7 @@
     <string name="settings_section_api">API設定</string>
     <string name="settings_api_key">OpenWeatherMap APIキー</string>
     <string name="settings_section_about">情報</string>
-    <string name="settings_about_message">このアプリは「歩け」と言わないアプリです。</string>
+    <string name="settings_about_message">気圧と体調のつながりを記録して、あなただけのパターンを見つけるアプリです。</string>
 
     <!-- Errors (calm, non-alarming phrasing) -->
     <string name="error_steps_fetch">歩数の取得ができませんでした</string>
@@ -59,4 +59,9 @@
     <!-- Placeholder -->
     <string name="placeholder_memo">今日の気づきなど（任意）</string>
     <string name="placeholder_no_data">データがありません</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_skip">スキップ</string>
+    <string name="onboarding_next">次へ</string>
+    <string name="onboarding_start">はじめる</string>
 </resources>
