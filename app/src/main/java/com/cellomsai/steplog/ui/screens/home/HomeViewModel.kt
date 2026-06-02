@@ -15,6 +15,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -35,6 +36,8 @@ data class HomeUiState(
     val shouldRequestHealthConnect: Boolean = false,
     // HC から実際に読み取った歩数。null=未読 or 読み取り失敗、0以上=実際の値
     val lastHcSteps: Int? = null,
+    // 前日の気圧（トレンド表示用）
+    val yesterdayPressure: Float? = null,
 )
 
 @HiltViewModel
@@ -87,6 +90,11 @@ class HomeViewModel @Inject constructor(
             refreshSteps()
         }
         viewModelScope.launch { fetchWeatherIfNeeded(today) }
+        viewModelScope.launch {
+            val yesterday = today.minusDays(1)
+            val yesterdayRecord = repository.observeByDate(yesterday).first()
+            _uiState.update { it.copy(yesterdayPressure = yesterdayRecord?.pressure) }
+        }
     }
 
     // ON_RESUME から呼ばれる：権限状態を再確認して歩数・気圧を更新

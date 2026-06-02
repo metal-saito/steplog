@@ -114,14 +114,7 @@ fun GraphScreen(viewModel: GraphViewModel = hiltViewModel()) {
                 }
             } else {
                 // 気圧×体調 相関インサイト（最重要カード）
-                val insight = uiState.correlationInsight
-                val correlationDataPoints = uiState.records.count { r ->
-                    r.pressure != null && (r.dizzinessLevel != null || r.fatigueLevel != null)
-                }
-                CorrelationInsightCard(
-                    insight = insight,
-                    neededDays = (5 - correlationDataPoints).coerceAtLeast(0),
-                )
+                CorrelationInsightCard(insight = uiState.correlationInsight)
 
                 // 歩数グラフ
                 ChartCard(title = "歩数") {
@@ -431,13 +424,15 @@ private fun ConditionChart(
 @Composable
 private fun CorrelationInsightCard(
     insight: CorrelationInsight?,
-    neededDays: Int,
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
             Text(
                 text = "気圧 × 体調の相関",
                 style = MaterialTheme.typography.titleSmall,
@@ -445,80 +440,73 @@ private fun CorrelationInsightCard(
             )
 
             if (insight == null) {
-                val remaining = neededDays
                 Text(
-                    text = if (remaining > 0)
-                        "データがあと ${remaining} 日分蓄積されると相関が表示されます（気圧と体調の両方を記録した日が必要です）"
-                    else
-                        "気圧と体調の両方が記録された日が少なくとも5日必要です",
+                    text = "気圧と体調の両方が記録された日が増えると、ここに傾向が現れます。",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = MaterialTheme.typography.bodySmall.fontSize * 1.6,
                 )
             } else {
-                // 低気圧 vs 高気圧 の不調バー比較
+                // 低気圧 vs 高気圧 の不調スコアバー比較
                 listOf(
-                    Triple("低気圧（${insight.threshold.toInt()}hPa未満）", insight.lowPressureDays, insight.lowPressureAvgBadness),
-                    Triple("高気圧（${insight.threshold.toInt()}hPa以上）", insight.highPressureDays, insight.highPressureAvgBadness),
+                    Triple("低気圧  〜 ${insight.threshold.toInt()} hPa", insight.lowPressureDays, insight.lowPressureAvgBadness),
+                    Triple("高気圧  ${insight.threshold.toInt()} hPa 〜", insight.highPressureDays, insight.highPressureAvgBadness),
                 ).forEach { (label, days, badness) ->
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
-                                text = "$label  （${days}日）",
-                                style = MaterialTheme.typography.labelSmall,
+                                text = label,
+                                style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                             Text(
-                                text = "不調 %.1f / 5".format(badness),
-                                style = MaterialTheme.typography.labelSmall,
+                                text = "${days}日  不調 %.1f".format(badness),
+                                style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurface,
                             )
                         }
-                        // Progress bar
-                        val fillFraction = (badness / 5f).coerceIn(0f, 1f)
-                        val barColor = if (badness >= 2.5f)
-                            MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
-                        else
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(10.dp)
+                                .height(12.dp)
                                 .background(
                                     MaterialTheme.colorScheme.surfaceVariant,
-                                    RoundedCornerShape(5.dp),
+                                    RoundedCornerShape(6.dp),
                                 ),
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .fillMaxWidth(fillFraction)
-                                    .height(10.dp)
-                                    .background(barColor, RoundedCornerShape(5.dp)),
+                                    .fillMaxWidth((badness / 5f).coerceIn(0f, 1f))
+                                    .height(12.dp)
+                                    .background(
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.65f),
+                                        RoundedCornerShape(6.dp),
+                                    ),
                             )
                         }
                     }
                 }
 
-                // 結論テキスト
+                // 傾向サマリー
                 Surface(
                     shape = MaterialTheme.shapes.small,
-                    color = if (insight.diff > 0.5f)
-                        MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f)
-                    else
-                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
                 ) {
                     Text(
                         text = insight.summaryText,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        lineHeight = MaterialTheme.typography.bodySmall.fontSize * 1.6,
                     )
                 }
 
                 Text(
-                    text = "集計対象: ${insight.totalPoints}日分のデータ",
+                    text = "${insight.totalPoints}日分のデータをもとに集計",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

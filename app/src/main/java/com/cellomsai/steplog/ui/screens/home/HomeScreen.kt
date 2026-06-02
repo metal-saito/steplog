@@ -269,7 +269,10 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
                         shrinkVertically(animationSpec = tween(200), shrinkTowards = Alignment.Top),
                 ) {
                     uiState.record?.pressure?.let { pressure ->
-                        PressureChip(pressure = pressure)
+                        PressureChip(
+                            pressure = pressure,
+                            trend = pressureTrend(pressure, uiState.yesterdayPressure),
+                        )
                     }
                 }
 
@@ -378,16 +381,28 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
     }
 }
 
+private enum class PressureTrend { RISING, FALLING, STABLE }
+
+private fun pressureTrend(today: Float, yesterday: Float?): PressureTrend? {
+    if (yesterday == null) return null
+    val delta = today - yesterday
+    return when {
+        delta > 2f -> PressureTrend.RISING
+        delta < -2f -> PressureTrend.FALLING
+        else -> PressureTrend.STABLE
+    }
+}
+
 @Composable
-private fun PressureChip(pressure: Float) {
+private fun PressureChip(pressure: Float, trend: PressureTrend?) {
     Surface(
         shape = MaterialTheme.shapes.small,
         color = MaterialTheme.colorScheme.surfaceVariant,
     ) {
         Row(
-            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
         ) {
             Icon(
                 imageVector = Icons.Outlined.Air,
@@ -395,11 +410,25 @@ private fun PressureChip(pressure: Float) {
                 modifier = Modifier.size(24.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Text(
-                text = "気圧  %.1f hPa".format(pressure),
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
+            Column {
+                Text(
+                    text = "%.1f hPa".format(pressure),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                if (trend != null) {
+                    val (symbol, label) = when (trend) {
+                        PressureTrend.RISING -> "↑" to "昨日より上昇"
+                        PressureTrend.FALLING -> "↓" to "昨日より下降"
+                        PressureTrend.STABLE -> "→" to "昨日とほぼ同じ"
+                    }
+                    Text(
+                        text = "$symbol $label",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
         }
     }
 }
