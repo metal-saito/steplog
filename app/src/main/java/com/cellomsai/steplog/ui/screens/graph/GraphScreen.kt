@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -143,26 +144,41 @@ fun GraphScreen(viewModel: GraphViewModel = hiltViewModel()) {
 
                 ChartCard(title = "体重（kg）") {
                     if (weightPoints.isEmpty()) {
-                        Box(
+                        EmptyChartPlaceholder("体重データなし")
+                    } else {
+                        val color = MaterialTheme.colorScheme.tertiary
+                        LineChart(
+                            points = weightPoints,
+                            totalDays = uiState.range.days,
+                            lineColor = color,
+                            dotColor = color,
+                            unitFormat = { "%.1f".format(it) },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(120.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                text = "体重データなし",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
+                        )
+                    }
+                }
+
+                // 気圧グラフ
+                val pressurePoints = remember(allDates, recordsByDate) {
+                    allDates.mapIndexedNotNull { i, date ->
+                        val p = recordsByDate[date.toString()]?.pressure
+                        if (p != null) i to p else null
+                    }
+                }
+
+                ChartCard(title = "気圧（hPa）") {
+                    if (pressurePoints.isEmpty()) {
+                        EmptyChartPlaceholder("気圧データなし")
                     } else {
-                        val lineColor = MaterialTheme.colorScheme.tertiary
-                        val dotColor = MaterialTheme.colorScheme.tertiary
-                        WeightLineChart(
-                            points = weightPoints,
+                        val color = MaterialTheme.colorScheme.secondary
+                        LineChart(
+                            points = pressurePoints,
                             totalDays = uiState.range.days,
-                            lineColor = lineColor,
-                            dotColor = dotColor,
+                            lineColor = color,
+                            dotColor = color,
+                            unitFormat = { "%.0f".format(it) },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(120.dp),
@@ -265,54 +281,94 @@ private fun StepsBarChart(
     }
 }
 
+@Composable
+private fun EmptyChartPlaceholder(message: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(120.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
 /**
- * Line chart for weight data. Draws segments between consecutive non-null points,
- * skipping gaps where no data was recorded.
+ * 折れ線グラフ（体重・気圧など連続値用）。記録のある日同士だけを直線でつなぎ、
+ * 入力のない日（欠損）はスキップする。
  *
- * @param points list of (dateIndex, weightKg) for days that have weight data
- * @param totalDays total number of days in the displayed range (x-axis span)
+ * @param points 値のある日の (日付インデックス, 値) のリスト
+ * @param totalDays 表示期間の日数（X 軸スパン）
+ * @param unitFormat 最大値・最小値ラベルの整形関数
  */
 @Composable
-private fun WeightLineChart(
+private fun LineChart(
     points: List<Pair<Int, Float>>,
     totalDays: Int,
     lineColor: Color,
     dotColor: Color,
+    unitFormat: (Float) -> String,
     modifier: Modifier = Modifier,
 ) {
-    Canvas(modifier = modifier) {
-        if (points.isEmpty()) return@Canvas
+    val minValue = points.minOf { it.second }
+    val maxValue = points.maxOf { it.second }
+    val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
 
-        val minWeight = points.minOf { it.second }
-        val maxWeight = points.maxOf { it.second }
-        val weightRange = (maxWeight - minWeight).coerceAtLeast(1f)
-
-        fun xOf(index: Int) = if (totalDays <= 1) size.width / 2f
-            else (index.toFloat() / (totalDays - 1)) * size.width
-
-        fun yOf(weight: Float) = size.height - ((weight - minWeight) / weightRange) * size.height * 0.85f - size.height * 0.075f
-
-        // draw line segments between consecutive recorded points
-        for (i in 0 until points.size - 1) {
-            val (idxA, wA) = points[i]
-            val (idxB, wB) = points[i + 1]
-            drawLine(
-                color = lineColor.copy(alpha = 0.8f),
-                start = Offset(xOf(idxA), yOf(wA)),
-                end = Offset(xOf(idxB), yOf(wB)),
-                strokeWidth = 3.dp.toPx(),
-                cap = StrokeCap.Round,
+    Row(modifier = modifier) {
+        // 左側に最大値・最小値の目盛りラベル（読みやすさ向上）
+        Column(
+            modifier = Modifier
+                .fillMaxHeight()
+                .width(40.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
+            horizontalAlignment = Alignment.End,
+        ) {
+            Text(
+                text = unitFormat(maxValue),
+                style = MaterialTheme.typography.labelSmall,
+                color = labelColor,
+            )
+            Text(
+                text = unitFormat(minValue),
+                style = MaterialTheme.typography.labelSmall,
+                color = labelColor,
             )
         }
+        Spacer(modifier = Modifier.width(8.dp))
+        Canvas(modifier = Modifier.weight(1f).fillMaxHeight()) {
+            val range = (maxValue - minValue).coerceAtLeast(1f)
 
-        // draw dots at each data point
-        val dotRadius = 4.dp.toPx()
-        points.forEach { (idx, w) ->
-            drawCircle(
-                color = dotColor,
-                radius = dotRadius,
-                center = Offset(xOf(idx), yOf(w)),
-            )
+            fun xOf(index: Int) = if (totalDays <= 1) size.width / 2f
+                else (index.toFloat() / (totalDays - 1)) * size.width
+
+            fun yOf(value: Float) =
+                size.height - ((value - minValue) / range) * size.height * 0.85f - size.height * 0.075f
+
+            // 記録のある点同士だけを線でつなぐ（欠損日はまたいでつなぐ）
+            for (i in 0 until points.size - 1) {
+                val (idxA, vA) = points[i]
+                val (idxB, vB) = points[i + 1]
+                drawLine(
+                    color = lineColor.copy(alpha = 0.8f),
+                    start = Offset(xOf(idxA), yOf(vA)),
+                    end = Offset(xOf(idxB), yOf(vB)),
+                    strokeWidth = 3.dp.toPx(),
+                    cap = StrokeCap.Round,
+                )
+            }
+
+            val dotRadius = 4.dp.toPx()
+            points.forEach { (idx, v) ->
+                drawCircle(
+                    color = dotColor,
+                    radius = dotRadius,
+                    center = Offset(xOf(idx), yOf(v)),
+                )
+            }
         }
     }
 }

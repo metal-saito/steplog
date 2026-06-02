@@ -196,13 +196,13 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
                             Icon(
                                 imageVector = Icons.Outlined.Air,
                                 contentDescription = "気圧",
-                                modifier = Modifier.size(14.dp),
+                                modifier = Modifier.size(18.dp),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                             Text(
                                 text = "%.0f hPa".format(pressure),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurface,
                             )
                         }
                     }
@@ -312,19 +312,19 @@ private fun PressureChip(pressure: Float) {
     ) {
         Row(
             verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
         ) {
             Icon(
                 imageVector = Icons.Outlined.Air,
                 contentDescription = null,
-                modifier = Modifier.size(16.dp),
+                modifier = Modifier.size(24.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
                 text = "気圧  %.1f hPa".format(pressure),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface,
             )
         }
     }

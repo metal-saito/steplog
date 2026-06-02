@@ -51,7 +51,12 @@ class HomeViewModel @Inject constructor(
         val today = LocalDate.now()
         viewModelScope.launch {
             repository.observeByDate(today).collect { record ->
-                _uiState.update { it.copy(record = record, steps = record?.steps ?: 0) }
+                _uiState.update {
+                    // 当日の歩数は減らさない（保存済み値とライブ値の大きい方を表示）。
+                    // 体調・体重などを記録しても歩数表示が巻き戻らないようにする。
+                    val steps = maxOf(record?.steps ?: 0, it.steps)
+                    it.copy(record = record, steps = steps)
+                }
             }
         }
 
@@ -163,6 +168,10 @@ class HomeViewModel @Inject constructor(
                 }
             }
             if (steps != null) {
+                // ライブ読み取り結果を即時に画面へ反映（DB 反映の往復を待たない）。
+                // 記録操作後・ポーリング中も当日歩数が常に最新になる。当日値は減らさない。
+                _uiState.update { it.copy(steps = maxOf(it.steps, steps)) }
+                // 当日分のみ保存。過去日は touch しない（捏造防止）。
                 runCatching { repository.saveSteps(today, steps) }
             }
             if (showLoading) _uiState.update { it.copy(isLoadingSteps = false) }
