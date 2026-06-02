@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>気圧ノート — アプリ仕様書</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      font-family: "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", sans-serif;
+      font-size: 15px;
+      line-height: 1.8;
+      color: #2c2c2c;
+      background: #f8f9fa;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 40px 32px 80px;
+      background: #fff;
+      min-height: 100vh;
+      box-shadow: 0 0 24px rgba(0,0,0,.06);
+    }
+    h1 {
+      font-size: 1.9em;
+      border-bottom: 3px solid #8fa68e;
+      padding-bottom: 12px;
+      margin-bottom: 32px;
+      color: #2c2c2c;
+    }
+    h2 {
+      font-size: 1.3em;
+      color: #fff;
+      background: #8fa68e;
+      margin: 48px -32px 24px;
+      padding: 10px 32px;
+    }
+    h3 {
+      font-size: 1.1em;
+      color: #4a7c59;
+      border-left: 4px solid #8fa68e;
+      padding-left: 12px;
+      margin-top: 28px;
+    }
+    h4 {
+      font-size: 1em;
+      color: #2c2c2c;
+      margin-top: 20px;
+    }
+    p { margin: 0 0 12px; }
+    ul, ol {
+      padding-left: 1.5em;
+      margin-bottom: 12px;
+    }
+    li { margin-bottom: 4px; }
+    code {
+      background: #f0f4f0;
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: .9em;
+      color: #4a7c59;
+    }
+    pre {
+      background: #f0f4f0;
+      border-radius: 6px;
+      padding: 16px;
+      overflow-x: auto;
+      font-size: .88em;
+      line-height: 1.6;
+      margin-bottom: 16px;
+    }
+    pre code {
+      background: none;
+      padding: 0;
+      color: #2c2c2c;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 16px;
+      font-size: .93em;
+    }
+    th {
+      background: #e8f0e8;
+      color: #2c2c2c;
+      padding: 8px 12px;
+      text-align: left;
+      border: 1px solid #c8d8c8;
+    }
+    td {
+      padding: 7px 12px;
+      border: 1px solid #d8e4d8;
+    }
+    tr:nth-child(even) td { background: #f5f9f5; }
+    hr {
+      border: none;
+      border-top: 1px solid #dde8dd;
+      margin: 36px 0;
+    }
+    strong { color: #3a6644; }
+    a { color: #4a7c59; }
+  </style>
+</head>
+<body>
+  <div class="container">
+<h1>気圧ノート — アプリ仕様書</h1>
+<h2>1. アプリ概要</h2>
+<table>
+<thead>
+<tr>
+<th>項目</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>アプリ名</td>
+<td>気圧ノート</td>
+</tr>
+<tr>
+<td>パッケージ名</td>
+<td>com.cellomsai.steplog</td>
+</tr>
+<tr>
+<td>対象プラットフォーム</td>
+<td>Android</td>
+</tr>
+<tr>
+<td>最小 SDK</td>
+<td>API 26（Android 8.0）</td>
+</tr>
+<tr>
+<td>ターゲット SDK</td>
+<td>API 35</td>
+</tr>
+</tbody>
+</table>
+<h3>コンセプト</h3>
+<p>「気圧と体調のつながりを記録して、あなただけのパターンを見つけるアプリ」</p>
+<ul>
+<li>気圧の変化（低気圧・高気圧）と、めまい・疲労感・睡眠・体重の相関を可視化する</li>
+<li><strong>「歩けと言わない」</strong> — 歩数目標の押し付けや、行動を促すような文言は一切使わない</li>
+<li>事実を静かに記録・提示することに徹し、ユーザーを急かさない</li>
+<li>データはすべて端末内（Room DB）に保存。外部送信はしない（気圧取得 API を除く）</li>
+</ul>
+<hr />
+<h2>2. 画面構成</h2>
+<pre><code>起動
+ └─ スプラッシュ画面（SplashScreen API）
+      ├─ オンボーディング（初回のみ）4ページ
+      └─ メイン画面
+           ├─ ホーム（今日）     … BottomBar タブ 1
+           ├─ カレンダー         … BottomBar タブ 2
+           │    └─ 日付詳細      … カレンダーセルをタップで遷移
+           ├─ グラフ             … BottomBar タブ 3
+           └─ 設定               … BottomBar タブ 4
+</code></pre>
+<hr />
+<h2>3. オンボーディング</h2>
+<ul>
+<li>初回起動時のみ表示。DataStore に完了フラグ（<code>onboarding_done</code>）を保存し、以降はスキップ</li>
+<li><code>HorizontalPager</code> による 4 ページ構成。任意のページで「スキップ」可能</li>
+<li>最終ページのみ「はじめる」ボタンを表示</li>
+<li>ページインジケーター: 選択中は幅 24dp・未選択は 8dp のピル型ドット（spring アニメーション）</li>
+</ul>
+<h3>ページ内容</h3>
+<table>
+<thead>
+<tr>
+<th>ページ</th>
+<th>アイコン</th>
+<th>タイトル</th>
+<th>本文</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Air</td>
+<td>低気圧のとき、体調が変わりませんか？</td>
+<td>頭痛・めまい・だるさと気圧の関係を記録してパターンを発見</td>
+</tr>
+<tr>
+<td>2</td>
+<td>WbSunny</td>
+<td>気圧は自動で記録</td>
+<td>位置情報から毎日の気圧を自動取得</td>
+</tr>
+<tr>
+<td>3</td>
+<td>FavoriteBorder</td>
+<td>体調・体重を毎日記録</td>
+<td>めまい・疲労感・睡眠・体重をカンタン入力</td>
+</tr>
+<tr>
+<td>4</td>
+<td>BarChart</td>
+<td>相関グラフで傾向を把握</td>
+<td>低気圧と不調が重なるパターンをグラフで可視化</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>4. ホーム画面（今日）</h2>
+<p>今日の記録を確認・入力するメイン画面。</p>
+<h3>4-1. ヘッダー</h3>
+<ul>
+<li><strong>日付表示</strong>（TopAppBar タイトル）: <code>yyyy年M月d日 (E)</code> 形式</li>
+<li><strong>気圧表示</strong>（TopAppBar アクション）: 気圧データがある場合のみ <code>xxx hPa</code> を表示</li>
+</ul>
+<h3>4-2. 歩数リング（StepsDisplay）</h3>
+<ul>
+<li>直径 200dp の円弧プログレスリング（目標: 10,000 歩）</li>
+<li>中央に歩数カウンター（数字アニメーション付き）</li>
+<li>10,000 歩未満: ラベル「歩」、リング色 <code>primary</code></li>
+<li>10,000 歩達成: ラベル「目標達成」、リング色 <code>tertiary</code>（1.2 秒かけてカラーアニメーション）</li>
+<li>初回表示時に 0.72x → 1.0x のスケールバウンスアニメーション</li>
+</ul>
+<h3>4-3. 気圧チップ</h3>
+<ul>
+<li>気圧データがある日のみ <code>AnimatedVisibility</code> でフェード＋展開表示</li>
+<li>表示内容: 気圧値 <code>xxx.x hPa</code> ＋ 昨日との比較トレンド</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>条件</th>
+<th>表示</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>今日 − 昨日 &gt; 2 hPa</td>
+<td>↑ 昨日より上昇</td>
+</tr>
+<tr>
+<td>今日 − 昨日 &lt; −2 hPa</td>
+<td>↓ 昨日より下降</td>
+</tr>
+<tr>
+<td>その他</td>
+<td>→ 昨日とほぼ同じ</td>
+</tr>
+<tr>
+<td>昨日のデータなし</td>
+<td>トレンド非表示</td>
+</tr>
+</tbody>
+</table>
+<h3>4-4. 気圧インサイトメッセージ</h3>
+<ul>
+<li>低気圧・急落時のみ穏やかなコンテキストメッセージを表示（<code>AnimatedVisibility</code>）</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>条件</th>
+<th>メッセージ</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>下降中 かつ 気圧 &lt; 1000 hPa</td>
+<td>気圧が急激に下がっています。体調に変化があれば記録してみましょう。</td>
+</tr>
+<tr>
+<td>下降中（1000 hPa 以上）</td>
+<td>気圧が下がり気味です。体調の変化を気にしながら過ごしてみましょう。</td>
+</tr>
+<tr>
+<td>安定 かつ 気圧 &lt; 998 hPa</td>
+<td>低気圧が続いています。体調の変化を記録しておくと、あとで傾向が見えます。</td>
+</tr>
+<tr>
+<td>その他</td>
+<td>表示なし</td>
+</tr>
+</tbody>
+</table>
+<h3>4-5. 体調入力フォーム（BodyConditionInput）</h3>
+<p>200ms 遅延後にスライドアップ＋フェードで登場。</p>
+<table>
+<thead>
+<tr>
+<th>入力項目</th>
+<th>型</th>
+<th>範囲</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>めまい度</td>
+<td>スライダー（整数）</td>
+<td>0〜5</td>
+</tr>
+<tr>
+<td>疲労度</td>
+<td>スライダー（整数）</td>
+<td>0〜5</td>
+</tr>
+<tr>
+<td>睡眠時間</td>
+<td>スライダー（小数）</td>
+<td>0〜12 時間</td>
+</tr>
+<tr>
+<td>体重</td>
+<td>テキスト入力（Float）</td>
+<td>任意</td>
+</tr>
+<tr>
+<td>備考</td>
+<td>テキスト入力（複数行）</td>
+<td>任意</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>「記録する」ボタンで保存。保存完了時に Snackbar 表示</li>
+<li>当日の歩数は「記録する」を押しても上書き保存し続ける（歩数は減らない）</li>
+</ul>
+<h3>4-6. 歩数取得ロジック</h3>
+<p>優先順位:</p>
+<ol>
+<li><strong>歩数センサー優先</strong>: <code>ACTIVITY_RECOGNITION</code> 許可あり＋センサー搭載 → <code>StepSensorManager</code> で読み取り（Health Connect の値を seed として差分加算）</li>
+<li><strong>Health Connect</strong>: センサー不可 → <code>HealthConnectManager</code> で当日歩数を読み取り</li>
+<li>
+<p><strong>どちらも不可</strong>: 歩数取得なし</p>
+</li>
+<li>
+<p>4 秒ごとにバックグラウンドポーリング（<code>showLoading = false</code> でスピナー非表示）</p>
+</li>
+<li>引き下げ更新（Pull-to-refresh）でも歩数を再取得</li>
+<li>当日歩数は単調増加（DB 保存値とライブ値の大きい方を表示）</li>
+</ol>
+<h3>4-7. 権限・連携ガイダンス</h3>
+<p>歩数が 0 のとき、状況に応じたガイダンスカードを表示:</p>
+<table>
+<thead>
+<tr>
+<th>状況</th>
+<th>カード内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>センサーあり・ACTIVITY_RECOGNITION 未許可</td>
+<td>歩数センサーを許可するよう誘導</td>
+</tr>
+<tr>
+<td>センサーなし・HC 未接続</td>
+<td>Health Connect への接続を誘導</td>
+</tr>
+<tr>
+<td>センサーなし・HC 接続済み・データなし</td>
+<td>Google Fit の HC 同期設定を案内</td>
+</tr>
+<tr>
+<td>HC 接続済みだが HC 歩数 0・センサーあり・歩数 &lt; 500</td>
+<td>Google Fit / OPPO ヘルスの HC 連携を案内</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>5. カレンダー画面</h2>
+<p>月単位でデータを俯瞰するカレンダービュー。</p>
+<ul>
+<li>ヘッダーに <code>◀ yyyy年M月 ▶</code> ナビゲーション</li>
+<li>週始まりは日曜日</li>
+<li>各セルに表示:</li>
+<li>日付数字</li>
+<li>歩数（1000 歩以上は <code>Nk</code> 形式、未入力は非表示）</li>
+<li>めまい度に対応した色のドット（ConditionColors: 0〜5 の 6 段階）</li>
+<li>今日のセルに枠線（outline）</li>
+<li>未来日はタップ不可（薄表示）</li>
+<li>セルをタップすると日付詳細画面へ遷移</li>
+</ul>
+<hr />
+<h2>6. 日付詳細画面</h2>
+<p>カレンダーから選択した日の詳細を表示・編集する画面。</p>
+<ul>
+<li>下から上にスライド＋フェードで登場（モーダル風）</li>
+<li><code>StepsDisplay</code>（その日の歩数リング表示）</li>
+<li><code>BodyConditionInput</code>（体調・体重・備考の編集）</li>
+<li>気圧値（hPa）テキスト表示</li>
+<li>過去日の歩数は変更不可（捏造防止。フォームからは体調・体重・備考のみ保存）</li>
+</ul>
+<hr />
+<h2>7. グラフ画面</h2>
+<p>期間を選んで各データのグラフを確認する画面。</p>
+<h3>7-1. 期間選択</h3>
+<p><code>SingleChoiceSegmentedButtonRow</code> で切り替え。切り替えるとすべてのグラフが再アニメーション。</p>
+<table>
+<thead>
+<tr>
+<th>ラベル</th>
+<th>期間</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>7日</td>
+<td>直近 7 日間</td>
+</tr>
+<tr>
+<td>30日</td>
+<td>直近 30 日間</td>
+</tr>
+<tr>
+<td>90日</td>
+<td>直近 90 日間</td>
+</tr>
+</tbody>
+</table>
+<h3>7-2. サマリーカード</h3>
+<ul>
+<li><strong>平均歩数</strong>: 歩数 &gt; 0 の日の平均</li>
+<li><strong>体調記録日数</strong>: めまい度または疲労度が記録されている日数</li>
+</ul>
+<h3>7-3. 気圧 × 体調の相関カード（最上位表示）</h3>
+<ul>
+<li><strong>表示条件</strong>: 気圧と体調の両方が入力された日が <strong>5 日以上</strong> あること</li>
+<li><strong>未達成時</strong>: 「気圧と体調の両方が記録された日が増えると、ここに傾向が現れます。」を静かに表示</li>
+<li><strong>達成時</strong>: 閾値 1005 hPa で低気圧／高気圧の日を分類し、平均不調スコア（(めまい+疲労)/2）を比較</li>
+</ul>
+<p>不調スコアバー（0〜5 のスケール）が spring アニメーションで伸びる</p>
+<table>
+<thead>
+<tr>
+<th>diff（低気圧 − 高気圧）</th>
+<th>サマリーテキスト</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>&gt; 0.5</td>
+<td>低気圧の日は不調スコアが N.N 高い傾向があります</td>
+</tr>
+<tr>
+<td>&lt; −0.5</td>
+<td>高気圧の日のほうが不調になりやすい傾向があります</td>
+</tr>
+<tr>
+<td>その他</td>
+<td>気圧と体調の明確な相関は今のところ見られません</td>
+</tr>
+</tbody>
+</table>
+<p>フッターに「N 日分のデータをもとに集計」を表示</p>
+<h3>7-4. 歩数グラフ（棒グラフ）</h3>
+<ul>
+<li>各日の歩数を棒グラフで表示</li>
+<li>グラフ表示時にバーが下から上へアニメーション（700ms、FastOutSlow）</li>
+<li>歩数 0 の日は最小高さ（2px）でグレー表示</li>
+</ul>
+<h3>7-5. 体重グラフ（折れ線グラフ）</h3>
+<ul>
+<li>記録のある日同士を直線でつなぐ（欠損日はまたいで連結）</li>
+<li>グラフ表示時に線が左から右へ描画アニメーション（900ms）</li>
+<li>左軸に最大値・最小値ラベル（小数第 1 位）</li>
+<li>ドットは描画アニメーション進捗に連動して出現</li>
+</ul>
+<h3>7-6. 気圧グラフ（折れ線グラフ）</h3>
+<ul>
+<li>体重グラフと同仕様（単位: hPa、小数第 0 位）</li>
+</ul>
+<h3>7-7. めまい度・疲労度グラフ（カラーバー）</h3>
+<ul>
+<li>各日を色付きの小矩形で並べて表示</li>
+<li>ConditionColors（0=緑系〜5=赤系）で体調レベルを色表現</li>
+<li>「めまい」「疲労」の 2 行</li>
+</ul>
+<hr />
+<h2>8. 設定画面</h2>
+<h3>8-1. 外観</h3>
+<ul>
+<li>テーマ切替: システム / ライト / ダーク（DataStore 永続化）</li>
+</ul>
+<h3>8-2. データ</h3>
+<ul>
+<li><strong>CSV 書き出し</strong>: 全記録を CSV ファイルに書き出してシェアシートを開く</li>
+<li><strong>データ削除</strong>: 確認ダイアログ後に全データを削除</li>
+</ul>
+<h3>8-3. Health Connect 連携（任意）</h3>
+<ul>
+<li>HC が利用可能な端末のみ表示</li>
+<li>未連携時: 連携ボタンで HC のパーミッションリクエストを起動</li>
+<li>連携済み時: 「連携を確認・変更する」ボタン</li>
+</ul>
+<h3>8-4. 気圧データ（任意）</h3>
+<ul>
+<li><strong>OpenWeatherMap API キー</strong> を入力・保存</li>
+<li>キーが空の場合は気圧取得を行わない（体調・歩数記録は通常通り使用可能）</li>
+<li>キー登録後は位置情報（<code>ACCESS_COARSE_LOCATION</code>）を取得し、当日の気圧を自動保存</li>
+</ul>
+<hr />
+<h2>9. データモデル</h2>
+<h3>DailyRecord（Room テーブル: <code>daily_records</code>）</h3>
+<table>
+<thead>
+<tr>
+<th>カラム</th>
+<th>型</th>
+<th>説明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>date</code></td>
+<td>String (PK)</td>
+<td><code>"yyyy-MM-dd"</code></td>
+</tr>
+<tr>
+<td><code>steps</code></td>
+<td>Int</td>
+<td>当日の歩数（デフォルト 0）</td>
+</tr>
+<tr>
+<td><code>dizzinessLevel</code></td>
+<td>Int?</td>
+<td>めまい度 0〜5、null = 未入力</td>
+</tr>
+<tr>
+<td><code>fatigueLevel</code></td>
+<td>Int?</td>
+<td>疲労度 0〜5、null = 未入力</td>
+</tr>
+<tr>
+<td><code>sleepHours</code></td>
+<td>Float?</td>
+<td>睡眠時間 0.0〜12.0</td>
+</tr>
+<tr>
+<td><code>pressure</code></td>
+<td>Float?</td>
+<td>気圧（hPa）</td>
+</tr>
+<tr>
+<td><code>memo</code></td>
+<td>String?</td>
+<td>備考</td>
+</tr>
+<tr>
+<td><code>weightKg</code></td>
+<td>Float?</td>
+<td>体重（kg）</td>
+</tr>
+<tr>
+<td><code>createdAt</code></td>
+<td>Long</td>
+<td>作成タイムスタンプ</td>
+</tr>
+<tr>
+<td><code>updatedAt</code></td>
+<td>Long</td>
+<td>更新タイムスタンプ</td>
+</tr>
+</tbody>
+</table>
+<h3>UserPreferences（DataStore）</h3>
+<table>
+<thead>
+<tr>
+<th>キー</th>
+<th>型</th>
+<th>説明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>onboarding_done</code></td>
+<td>Boolean</td>
+<td>オンボーディング完了フラグ</td>
+</tr>
+<tr>
+<td><code>app_theme</code></td>
+<td>String</td>
+<td>テーマ設定（SYSTEM / LIGHT / DARK）</td>
+</tr>
+<tr>
+<td><code>weather_api_key</code></td>
+<td>String</td>
+<td>OpenWeatherMap API キー</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>10. 外部連携</h2>
+<h3>10-1. 歩数センサー（StepSensorManager）</h3>
+<ul>
+<li><code>TYPE_STEP_COUNTER</code> センサーを使用</li>
+<li>端末起動からの累積歩数をセンサーから取得し、今日分の差分を計算</li>
+<li><code>ACTIVITY_RECOGNITION</code> パーミッション必須</li>
+</ul>
+<h3>10-2. Health Connect（HealthConnectManager）</h3>
+<ul>
+<li>読み取り: <code>StepsRecord</code>（当日 00:00〜現在）</li>
+<li>書き込み: なし（読み取り専用）</li>
+<li>端末に HC がインストールされていない場合は連携セクションを非表示</li>
+</ul>
+<h3>10-3. 気圧（WeatherRepository）</h3>
+<ul>
+<li>外部 API: OpenWeatherMap Current Weather API</li>
+<li>エンドポイント: <code>api.openweathermap.org/data/2.5/weather</code></li>
+<li>パラメーター: <code>lat</code>, <code>lon</code>, <code>appid</code>, <code>units=metric</code></li>
+<li>ユーザー提供の API キーが必要（無料プランで取得可能）</li>
+<li>当日の気圧が未取得のときのみ API を呼ぶ（重複取得防止）</li>
+<li>位置情報: <code>ACCESS_COARSE_LOCATION</code>。キャッシュ優先・フォールバックで 5 秒以内に取得</li>
+</ul>
+<hr />
+<h2>11. アーキテクチャ</h2>
+<pre><code>UI Layer        ─ Jetpack Compose + ViewModel (StateFlow)
+Domain Layer    ─ Repository パターン
+Data Layer      ─ Room DB / DataStore / Health Connect / Sensor / Weather API
+DI              ─ Hilt
+</code></pre>
+<ul>
+<li>MVVM アーキテクチャ</li>
+<li>単方向データフロー（<code>StateFlow</code> → Compose UI → イベント → ViewModel）</li>
+<li><code>@HiltViewModel</code> + <code>@AndroidEntryPoint</code></li>
+</ul>
+<hr />
+<h2>12. ナビゲーション・アニメーション</h2>
+<h3>タブ遷移（BottomNav）</h3>
+<ul>
+<li>タブ順に応じて左右スライド（1/3 オフセット）＋フェード（300ms）</li>
+<li>方向: 右タブへ移動 → 右からスライドイン</li>
+</ul>
+<h3>詳細画面</h3>
+<ul>
+<li>下から上へスライド＋フェード（340ms）でオープン</li>
+<li>上から下へスライド＋フェード（280ms）でクローズ</li>
+</ul>
+<h3>各種 UI アニメーション</h3>
+<table>
+<thead>
+<tr>
+<th>要素</th>
+<th>アニメーション</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>歩数リング（初回）</td>
+<td>スケール 0.72→1.0 バウンス（MediumBouncy spring）</td>
+</tr>
+<tr>
+<td>歩数カウンター</td>
+<td>数値ロールアップ（NoBouncy spring、StiffnessLow）</td>
+</tr>
+<tr>
+<td>歩数リング進捗</td>
+<td>円弧の伸び（NoBouncy spring、StiffnessLow）</td>
+</tr>
+<tr>
+<td>歩数リング色（目標達成）</td>
+<td>primary→tertiary カラー遷移（1200ms tween）</td>
+</tr>
+<tr>
+<td>気圧チップ・インサイト</td>
+<td>フェード＋縦展開（300〜400ms）</td>
+</tr>
+<tr>
+<td>体調フォーム（初回）</td>
+<td>200ms 遅延後にスライドアップ＋フェード（MediumBouncy spring）</td>
+</tr>
+<tr>
+<td>棒グラフ</td>
+<td>バーが下から上に成長（700ms FastOutSlow）</td>
+</tr>
+<tr>
+<td>折れ線グラフ</td>
+<td>左から右へ線が描画される（900ms FastOutSlow）</td>
+</tr>
+<tr>
+<td>相関バー</td>
+<td>spring アニメーションで 0 から伸びる（MediumBouncy spring）</td>
+</tr>
+<tr>
+<td>オンボーディングドット</td>
+<td>ピル幅 8dp→24dp（MediumBouncy spring）</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>13. テーマ・カラー</h2>
+<ul>
+<li>Material You (Material 3) ベース</li>
+<li>ベースカラー: セージグリーン系（<code>#8FA68E</code>）</li>
+<li>ConditionColors（0〜5）: 緑系（良好）〜赤系（不調）の 6 段階</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>レベル</th>
+<th>意味</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>良好</td>
+</tr>
+<tr>
+<td>1</td>
+<td>やや気になる</td>
+</tr>
+<tr>
+<td>2</td>
+<td>少し不調</td>
+</tr>
+<tr>
+<td>3</td>
+<td>不調</td>
+</tr>
+<tr>
+<td>4</td>
+<td>かなり不調</td>
+</tr>
+<tr>
+<td>5</td>
+<td>最悪</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>14. 権限一覧</h2>
+<table>
+<thead>
+<tr>
+<th>権限</th>
+<th>用途</th>
+<th>必須</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ACTIVITY_RECOGNITION</code></td>
+<td>歩数センサー読み取り</td>
+<td>任意</td>
+</tr>
+<tr>
+<td><code>ACCESS_COARSE_LOCATION</code></td>
+<td>気圧取得用の位置情報</td>
+<td>任意</td>
+</tr>
+<tr>
+<td>Health Connect <code>StepsRecord</code> 読み取り</td>
+<td>歩数の取得</td>
+<td>任意</td>
+</tr>
+</tbody>
+</table>
+<p>すべての権限は任意。未許可の場合でも体調・体重・備考の記録は正常に動作する。</p>
+<hr />
+<h2>15. データ方針</h2>
+<ul>
+<li>すべての記録データは端末内 Room DB にのみ保存</li>
+<li>気圧取得のみ外部 API（OpenWeatherMap）を使用。API キーはユーザー自身が取得・登録</li>
+<li>データエクスポート: CSV 形式でシェアシートへ書き出し（クラウド同期機能なし）</li>
+<li>データ削除: 設定画面から全件削除可能</li>
+<li>過去日の歩数は変更不可（当日のみ自動更新）</li>
+</ul>
+  </div>
+</body>
+</html>
