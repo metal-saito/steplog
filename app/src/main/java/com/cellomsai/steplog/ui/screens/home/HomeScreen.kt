@@ -6,11 +6,14 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -44,8 +47,10 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -73,6 +78,13 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
+
+    // Staggered entrance: body-condition form slides in after the step counter
+    var bodyFormVisible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        delay(200)
+        bodyFormVisible = true
+    }
 
     // ACTIVITY_RECOGNITION パーミッションリクエストランチャー
     val requestActivityRecognition = rememberLauncherForActivityResult(
@@ -337,17 +349,28 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
                     )
                 }
 
-                BodyConditionInput(
-                    initialDizziness = uiState.record?.dizzinessLevel,
-                    initialFatigue = uiState.record?.fatigueLevel,
-                    initialSleepHours = uiState.record?.sleepHours ?: 7f,
-                    initialWeightKg = uiState.record?.weightKg,
-                    initialMemo = uiState.record?.memo ?: "",
-                    isSaving = uiState.isSaving,
-                    onSave = { dizziness, fatigue, sleep, weightKg, memo ->
-                        viewModel.saveBodyCondition(dizziness, fatigue, sleep, weightKg, memo)
-                    },
-                )
+                AnimatedVisibility(
+                    visible = bodyFormVisible,
+                    enter = slideInVertically(
+                        initialOffsetY = { it / 4 },
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessMediumLow,
+                        ),
+                    ) + fadeIn(animationSpec = tween(380)),
+                ) {
+                    BodyConditionInput(
+                        initialDizziness = uiState.record?.dizzinessLevel,
+                        initialFatigue = uiState.record?.fatigueLevel,
+                        initialSleepHours = uiState.record?.sleepHours ?: 7f,
+                        initialWeightKg = uiState.record?.weightKg,
+                        initialMemo = uiState.record?.memo ?: "",
+                        isSaving = uiState.isSaving,
+                        onSave = { dizziness, fatigue, sleep, weightKg, memo ->
+                            viewModel.saveBodyCondition(dizziness, fatigue, sleep, weightKg, memo)
+                        },
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(8.dp))
             }

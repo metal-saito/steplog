@@ -1,9 +1,13 @@
 package com.cellomsai.steplog.ui.navigation
 
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.BarChart
@@ -56,8 +60,11 @@ val bottomNavItems = listOf(
     BottomNavItem(Screen.Settings, R.string.nav_settings, Icons.Outlined.Settings),
 )
 
-private const val TAB_FADE_MS = 240
-private const val DETAIL_SLIDE_MS = 320
+private fun tabIndex(route: String?) =
+    bottomNavItems.indexOfFirst { it.screen.route == route }
+
+private const val TAB_ANIM_MS = 300
+private const val DETAIL_ANIM_MS = 340
 
 @Composable
 fun StepLogNavHost(navController: NavHostController, modifier: Modifier = Modifier) {
@@ -65,49 +72,91 @@ fun StepLogNavHost(navController: NavHostController, modifier: Modifier = Modifi
         navController = navController,
         startDestination = Screen.Home.route,
         modifier = modifier,
-        // Bottom-tab navigation: gentle cross-fade
-        enterTransition = { fadeIn(animationSpec = tween(TAB_FADE_MS)) },
-        exitTransition = { fadeOut(animationSpec = tween(TAB_FADE_MS)) },
-        popEnterTransition = { fadeIn(animationSpec = tween(TAB_FADE_MS)) },
-        popExitTransition = { fadeOut(animationSpec = tween(TAB_FADE_MS)) },
+        // Directional horizontal slide between tabs (left/right based on tab order)
+        enterTransition = {
+            val from = tabIndex(initialState.destination.route)
+            val to = tabIndex(targetState.destination.route)
+            if (from >= 0 && to >= 0) {
+                val dir = if (to > from) 1 else -1
+                slideInHorizontally(
+                    initialOffsetX = { dir * it / 3 },
+                    animationSpec = tween(TAB_ANIM_MS, easing = FastOutSlowInEasing),
+                ) + fadeIn(tween(TAB_ANIM_MS))
+            } else {
+                fadeIn(tween(260))
+            }
+        },
+        exitTransition = {
+            val from = tabIndex(initialState.destination.route)
+            val to = tabIndex(targetState.destination.route)
+            if (from >= 0 && to >= 0) {
+                val dir = if (to > from) -1 else 1
+                slideOutHorizontally(
+                    targetOffsetX = { dir * it / 3 },
+                    animationSpec = tween(TAB_ANIM_MS - 30, easing = FastOutLinearInEasing),
+                ) + fadeOut(tween(TAB_ANIM_MS - 30))
+            } else {
+                fadeOut(tween(220))
+            }
+        },
+        popEnterTransition = {
+            val from = tabIndex(initialState.destination.route)
+            val to = tabIndex(targetState.destination.route)
+            if (from >= 0 && to >= 0) {
+                val dir = if (to > from) 1 else -1
+                slideInHorizontally(
+                    initialOffsetX = { dir * it / 3 },
+                    animationSpec = tween(TAB_ANIM_MS, easing = FastOutSlowInEasing),
+                ) + fadeIn(tween(TAB_ANIM_MS))
+            } else {
+                fadeIn(tween(260))
+            }
+        },
+        popExitTransition = {
+            val from = tabIndex(initialState.destination.route)
+            val to = tabIndex(targetState.destination.route)
+            if (from >= 0 && to >= 0) {
+                val dir = if (to > from) -1 else 1
+                slideOutHorizontally(
+                    targetOffsetX = { dir * it / 3 },
+                    animationSpec = tween(TAB_ANIM_MS - 30, easing = FastOutLinearInEasing),
+                ) + fadeOut(tween(TAB_ANIM_MS - 30))
+            } else {
+                fadeOut(tween(220))
+            }
+        },
     ) {
-        composable(Screen.Home.route) {
-            HomeScreen()
-        }
+        composable(Screen.Home.route) { HomeScreen() }
         composable(Screen.Calendar.route) {
             CalendarScreen(onDayClick = { date ->
                 navController.navigate(Screen.Detail.createRoute(date))
             })
         }
-        composable(Screen.Graph.route) {
-            GraphScreen()
-        }
-        composable(Screen.Settings.route) {
-            SettingsScreen()
-        }
+        composable(Screen.Graph.route) { GraphScreen() }
+        composable(Screen.Settings.route) { SettingsScreen() }
         composable(
             route = Screen.Detail.route,
-            // Detail screen slides up from the bottom (modal feel)
+            // Detail slides up from the bottom like a modal sheet
             enterTransition = {
                 slideInVertically(
-                    initialOffsetY = { it / 3 },
-                    animationSpec = tween(DETAIL_SLIDE_MS),
-                ) + fadeIn(animationSpec = tween(DETAIL_SLIDE_MS))
+                    initialOffsetY = { it / 2 },
+                    animationSpec = tween(DETAIL_ANIM_MS, easing = FastOutSlowInEasing),
+                ) + fadeIn(tween(DETAIL_ANIM_MS))
             },
             exitTransition = {
                 slideOutVertically(
-                    targetOffsetY = { it / 4 },
-                    animationSpec = tween(DETAIL_SLIDE_MS - 40),
-                ) + fadeOut(animationSpec = tween(DETAIL_SLIDE_MS - 40))
+                    targetOffsetY = { it / 3 },
+                    animationSpec = tween(DETAIL_ANIM_MS - 60, easing = FastOutLinearInEasing),
+                ) + fadeOut(tween(DETAIL_ANIM_MS - 60))
             },
             popEnterTransition = {
-                fadeIn(animationSpec = tween(TAB_FADE_MS))
+                fadeIn(tween(260))
             },
             popExitTransition = {
                 slideOutVertically(
-                    targetOffsetY = { it / 4 },
-                    animationSpec = tween(DETAIL_SLIDE_MS - 40),
-                ) + fadeOut(animationSpec = tween(DETAIL_SLIDE_MS - 40))
+                    targetOffsetY = { it / 3 },
+                    animationSpec = tween(DETAIL_ANIM_MS - 60, easing = FastOutLinearInEasing),
+                ) + fadeOut(tween(DETAIL_ANIM_MS - 60))
             },
             arguments = listOf(navArgument("date") { type = NavType.StringType }),
         ) { backStack ->
