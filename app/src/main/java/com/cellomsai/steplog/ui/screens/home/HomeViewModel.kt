@@ -33,6 +33,8 @@ data class HomeUiState(
     val activityRecognitionGranted: Boolean = false,
     val sensorAvailable: Boolean = false,
     val shouldRequestHealthConnect: Boolean = false,
+    // HC から実際に読み取った歩数。null=未読 or 読み取り失敗、0以上=実際の値
+    val lastHcSteps: Int? = null,
 )
 
 @HiltViewModel
@@ -157,6 +159,10 @@ class HomeViewModel @Inject constructor(
             val hcSteps: Int? = if (_uiState.value.healthConnectPermissionGranted) {
                 runCatching { healthConnect.readSteps(today) }.getOrNull()
             } else null
+            // HC の実際の値を UI に公開（0 = HC に歩数なし、null = 未接続 or 読み取り失敗）
+            if (_uiState.value.healthConnectPermissionGranted) {
+                _uiState.update { it.copy(lastHcSteps = hcSteps) }
+            }
             // 読み取り失敗時は null。0 で DB を上書きしてデータを失わないようにする
             val steps: Int? = when {
                 useSensor ->

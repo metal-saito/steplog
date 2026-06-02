@@ -286,6 +286,30 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
                     }
                 }
 
+                // HC は接続済みだが HC の歩数が 0 → Google Fit 等が HC に連携されていない可能性
+                // センサーが起動前の歩数を拾えず、HC にもデータがないケースを検知して案内する
+                if (!uiState.isLoadingSteps &&
+                    uiState.healthConnectPermissionGranted &&
+                    uiState.lastHcSteps == 0 &&
+                    uiState.sensorAvailable &&
+                    uiState.activityRecognitionGranted &&
+                    uiState.steps < 500
+                ) {
+                    HealthConnectGuidanceCard(
+                        title = "アプリ起動前の歩数が取得できていません",
+                        message = "歩数センサーはアプリが起動してからの差分しか計測できません。\n\n" +
+                            "Google Fit・OPPO ヘルスなどのアプリを Health Connect に「接続」すると、起動前に歩いた分も含む正確な歩数が取得できます。\n\n" +
+                            "※ これは「StepLog を HC に接続する」とは別の設定です。\n\n" +
+                            "① Health Connect を開く\n" +
+                            "② 「アプリとデータ」→「アプリの接続」\n" +
+                            "③ Google Fit / OPPO ヘルス を選んで読み取りを許可",
+                        primaryLabel = "Health Connect を開く",
+                        onPrimary = { openHealthConnect() },
+                        secondaryLabel = "更新",
+                        onSecondary = { viewModel.refreshSteps() },
+                    )
+                }
+
                 BodyConditionInput(
                     initialDizziness = uiState.record?.dizzinessLevel,
                     initialFatigue = uiState.record?.fatigueLevel,
