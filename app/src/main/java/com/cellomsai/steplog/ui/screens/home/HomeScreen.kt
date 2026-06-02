@@ -296,13 +296,14 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
                     uiState.steps < 500
                 ) {
                     HealthConnectGuidanceCard(
-                        title = "アプリ起動前の歩数が取得できていません",
-                        message = "歩数センサーはアプリが起動してからの差分しか計測できません。\n\n" +
-                            "Google Fit・OPPO ヘルスなどのアプリを Health Connect に「接続」すると、起動前に歩いた分も含む正確な歩数が取得できます。\n\n" +
-                            "※ これは「StepLog を HC に接続する」とは別の設定です。\n\n" +
-                            "① Health Connect を開く\n" +
-                            "② 「アプリとデータ」→「アプリの接続」\n" +
-                            "③ Google Fit / OPPO ヘルス を選んで読み取りを許可",
+                        title = "歩数アプリのデータが Health Connect に届いていません",
+                        message = "Health Connect から取得した本日の歩数は 0 歩でした。" +
+                            "そのため、アプリ起動前に歩いた分が反映されず、起動後の差分だけ（現在 ${uiState.steps} 歩）になっています。\n\n" +
+                            "Google Fit の歩数を反映するには、Google Fit 側で同期を有効にする必要があります：\n" +
+                            "① Google Fit を開く\n" +
+                            "②「プロフィール」→ 設定（⚙）\n" +
+                            "③「Google Fit のデータを Health Connect と同期」をオン\n\n" +
+                            "OPPO ヘルス（HeyTap）を使っている場合も、同様に Health Connect への接続を許可してください。",
                         primaryLabel = "Health Connect を開く",
                         onPrimary = { openHealthConnect() },
                         secondaryLabel = "更新",
