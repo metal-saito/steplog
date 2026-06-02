@@ -1,5 +1,10 @@
 package com.cellomsai.steplog.ui.navigation
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.CalendarMonth
@@ -51,9 +56,21 @@ val bottomNavItems = listOf(
     BottomNavItem(Screen.Settings, R.string.nav_settings, Icons.Outlined.Settings),
 )
 
+private const val TAB_FADE_MS = 240
+private const val DETAIL_SLIDE_MS = 320
+
 @Composable
 fun StepLogNavHost(navController: NavHostController, modifier: Modifier = Modifier) {
-    NavHost(navController = navController, startDestination = Screen.Home.route, modifier = modifier) {
+    NavHost(
+        navController = navController,
+        startDestination = Screen.Home.route,
+        modifier = modifier,
+        // Bottom-tab navigation: gentle cross-fade
+        enterTransition = { fadeIn(animationSpec = tween(TAB_FADE_MS)) },
+        exitTransition = { fadeOut(animationSpec = tween(TAB_FADE_MS)) },
+        popEnterTransition = { fadeIn(animationSpec = tween(TAB_FADE_MS)) },
+        popExitTransition = { fadeOut(animationSpec = tween(TAB_FADE_MS)) },
+    ) {
         composable(Screen.Home.route) {
             HomeScreen()
         }
@@ -70,6 +87,28 @@ fun StepLogNavHost(navController: NavHostController, modifier: Modifier = Modifi
         }
         composable(
             route = Screen.Detail.route,
+            // Detail screen slides up from the bottom (modal feel)
+            enterTransition = {
+                slideInVertically(
+                    initialOffsetY = { it / 3 },
+                    animationSpec = tween(DETAIL_SLIDE_MS),
+                ) + fadeIn(animationSpec = tween(DETAIL_SLIDE_MS))
+            },
+            exitTransition = {
+                slideOutVertically(
+                    targetOffsetY = { it / 4 },
+                    animationSpec = tween(DETAIL_SLIDE_MS - 40),
+                ) + fadeOut(animationSpec = tween(DETAIL_SLIDE_MS - 40))
+            },
+            popEnterTransition = {
+                fadeIn(animationSpec = tween(TAB_FADE_MS))
+            },
+            popExitTransition = {
+                slideOutVertically(
+                    targetOffsetY = { it / 4 },
+                    animationSpec = tween(DETAIL_SLIDE_MS - 40),
+                ) + fadeOut(animationSpec = tween(DETAIL_SLIDE_MS - 40))
+            },
             arguments = listOf(navArgument("date") { type = NavType.StringType }),
         ) { backStack ->
             val date = backStack.arguments?.getString("date") ?: return@composable

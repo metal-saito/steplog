@@ -5,6 +5,12 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -40,6 +46,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
@@ -242,11 +249,25 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
 
                 StepsDisplay(steps = uiState.steps)
 
-                uiState.record?.pressure?.let { pressure ->
-                    PressureChip(pressure = pressure)
+                AnimatedVisibility(
+                    visible = uiState.record?.pressure != null,
+                    enter = fadeIn(animationSpec = tween(300)) +
+                        expandVertically(animationSpec = tween(300), expandFrom = Alignment.Top),
+                    exit = fadeOut(animationSpec = tween(200)) +
+                        shrinkVertically(animationSpec = tween(200), shrinkTowards = Alignment.Top),
+                ) {
+                    uiState.record?.pressure?.let { pressure ->
+                        PressureChip(pressure = pressure)
+                    }
                 }
 
-                if (uiState.steps == 0 && !uiState.isLoadingSteps) {
+                AnimatedVisibility(
+                    visible = uiState.steps == 0 && !uiState.isLoadingSteps,
+                    enter = fadeIn(animationSpec = tween(350)) +
+                        expandVertically(animationSpec = tween(350), expandFrom = Alignment.Top),
+                    exit = fadeOut(animationSpec = tween(250)) +
+                        shrinkVertically(animationSpec = tween(250), shrinkTowards = Alignment.Top),
+                ) {
                     when {
                         // センサーが使えるが ACTIVITY_RECOGNITION が未許可
                         uiState.sensorAvailable && !uiState.activityRecognitionGranted -> {
@@ -287,13 +308,18 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
                 }
 
                 // HC は接続済みだが HC の歩数が 0 → Google Fit 等が HC に連携されていない可能性
-                // センサーが起動前の歩数を拾えず、HC にもデータがないケースを検知して案内する
-                if (!uiState.isLoadingSteps &&
+                val showHcSyncGuidance = !uiState.isLoadingSteps &&
                     uiState.healthConnectPermissionGranted &&
                     uiState.lastHcSteps == 0 &&
                     uiState.sensorAvailable &&
                     uiState.activityRecognitionGranted &&
                     uiState.steps < 500
+                AnimatedVisibility(
+                    visible = showHcSyncGuidance,
+                    enter = fadeIn(animationSpec = tween(350)) +
+                        expandVertically(animationSpec = tween(350), expandFrom = Alignment.Top),
+                    exit = fadeOut(animationSpec = tween(250)) +
+                        shrinkVertically(animationSpec = tween(250), shrinkTowards = Alignment.Top),
                 ) {
                     HealthConnectGuidanceCard(
                         title = "歩数アプリのデータが Health Connect に届いていません",

@@ -1,5 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Base theme required by Android before Compose takes over -->
+    <!-- Base theme (Compose takes over immediately after splash) -->
     <style name="Theme.StepLog" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <!-- Splash screen: sage-green background + white droplet icon -->
+    <style name="Theme.StepLog.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#8FA68E</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.StepLog</item>
+    </style>
 </resources>
