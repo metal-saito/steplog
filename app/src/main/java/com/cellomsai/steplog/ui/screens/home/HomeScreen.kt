@@ -276,6 +276,21 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
                     }
                 }
 
+                val todayPressure = uiState.record?.pressure
+                val pressureTrendValue = if (todayPressure != null) pressureTrend(todayPressure, uiState.yesterdayPressure) else null
+                AnimatedVisibility(
+                    visible = todayPressure != null &&
+                        (pressureTrendValue == PressureTrend.FALLING || todayPressure < 998f),
+                    enter = fadeIn(animationSpec = tween(400)) +
+                        expandVertically(animationSpec = tween(400), expandFrom = Alignment.Top),
+                    exit = fadeOut(animationSpec = tween(200)) +
+                        shrinkVertically(animationSpec = tween(200), shrinkTowards = Alignment.Top),
+                ) {
+                    if (todayPressure != null) {
+                        PressureInsightMessage(pressure = todayPressure, trend = pressureTrendValue)
+                    }
+                }
+
                 AnimatedVisibility(
                     visible = uiState.steps == 0 && !uiState.isLoadingSteps,
                     enter = fadeIn(animationSpec = tween(350)) +
@@ -431,6 +446,26 @@ private fun PressureChip(pressure: Float, trend: PressureTrend?) {
             }
         }
     }
+}
+
+@Composable
+private fun PressureInsightMessage(pressure: Float, trend: PressureTrend?) {
+    val message = when {
+        trend == PressureTrend.FALLING && pressure < 1000f ->
+            "気圧が急激に下がっています。体調に変化があれば記録してみましょう。"
+        trend == PressureTrend.FALLING ->
+            "気圧が下がり気味です。体調の変化を気にしながら過ごしてみましょう。"
+        pressure < 998f ->
+            "低気圧が続いています。体調の変化を記録しておくと、あとで傾向が見えます。"
+        else -> return
+    }
+    Text(
+        text = message,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        lineHeight = MaterialTheme.typography.bodySmall.fontSize * 1.6f,
+        modifier = Modifier.fillMaxWidth(),
+    )
 }
 
 @Composable
