@@ -198,6 +198,23 @@ fun GraphScreen(viewModel: GraphViewModel = hiltViewModel()) {
                     }
                 }
 
+                // 降水量グラフ（天気データがある場合のみ）
+                val precipitation = uiState.records.map { it.precipitationMm }
+                if (precipitation.any { it != null }) {
+                    ChartCard(title = "降水量（mm）") {
+                        val barColor = MaterialTheme.colorScheme.secondary
+                        val emptyColor = MaterialTheme.colorScheme.surfaceVariant
+                        PrecipitationBarChart(
+                            precipitation = precipitation,
+                            barColor = barColor,
+                            emptyColor = emptyColor,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(120.dp),
+                        )
+                    }
+                }
+
                 // 体調グラフ
                 ChartCard(title = "めまい度・疲労度") {
                     ConditionChart(
@@ -297,6 +314,55 @@ private fun StepsBarChart(
                 topLeft = Offset(left, size.height - barHeight),
                 size = Size(barWidth, barHeight),
             )
+        }
+    }
+}
+
+/**
+ * 降水量バーグラフ。null = 天気未取得（バーなし）、0 = 降水なし（最小高さのグレー）、
+ * 正値 = 降水量に応じた高さの青系バー。
+ */
+@Composable
+private fun PrecipitationBarChart(
+    precipitation: List<Float?>,
+    barColor: Color,
+    emptyColor: Color,
+    modifier: Modifier = Modifier,
+) {
+    val animProgress = remember { Animatable(0f) }
+    LaunchedEffect(precipitation) {
+        animProgress.snapTo(0f)
+        animProgress.animateTo(1f, animationSpec = tween(700, easing = FastOutSlowInEasing))
+    }
+
+    Canvas(modifier = modifier) {
+        if (precipitation.isEmpty()) return@Canvas
+        val p = animProgress.value
+        val maxMm = (precipitation.filterNotNull().maxOrNull() ?: 0f).coerceAtLeast(1f)
+        val n = precipitation.size
+        val slotWidth = size.width / n
+        val barWidth = (slotWidth * 0.6f).coerceAtLeast(2f)
+
+        precipitation.forEachIndexed { i, mm ->
+            // null は天気未取得 → バーを描かない
+            if (mm == null) return@forEachIndexed
+            val left = i * slotWidth + (slotWidth - barWidth) / 2f
+            if (mm <= 0f) {
+                // 降水なし: 最小高さのグレー
+                drawRect(
+                    color = emptyColor,
+                    topLeft = Offset(left, size.height - 2f),
+                    size = Size(barWidth, 2f),
+                )
+            } else {
+                val fullHeight = (mm / maxMm) * size.height
+                val barHeight = (fullHeight * p).coerceAtLeast(0f)
+                drawRect(
+                    color = barColor.copy(alpha = 0.75f),
+                    topLeft = Offset(left, size.height - barHeight),
+                    size = Size(barWidth, barHeight),
+                )
+            }
         }
     }
 }
@@ -504,15 +570,31 @@ private fun InsightBarRow(
 private fun CorrelationInsightCard(
     insight: CorrelationInsight?,
 ) {
+    fun fractionOf(target: Boolean, value: Float) = if (target) (value / 5f).coerceIn(0f, 1f) else 0f
+    val barSpec = spring<Float>(
+        dampingRatio = Spring.DampingRatioMediumBouncy,
+        stiffness = Spring.StiffnessLow,
+    )
     val lowBarFraction by animateFloatAsState(
-        targetValue = if (insight != null) (insight.lowPressureAvgBadness / 5f).coerceIn(0f, 1f) else 0f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+        targetValue = fractionOf(insight != null, insight?.lowPressureAvgBadness ?: 0f),
+        animationSpec = barSpec,
         label = "low_bar",
     )
     val highBarFraction by animateFloatAsState(
-        targetValue = if (insight != null) (insight.highPressureAvgBadness / 5f).coerceIn(0f, 1f) else 0f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+        targetValue = fractionOf(insight != null, insight?.highPressureAvgBadness ?: 0f),
+        animationSpec = barSpec,
         label = "high_bar",
+    )
+    val rain = insight?.rain
+    val rainyBarFraction by animateFloatAsState(
+        targetValue = fractionOf(rain != null, rain?.rainyAvgBadness ?: 0f),
+        animationSpec = barSpec,
+        label = "rainy_bar",
+    )
+    val dryBarFraction by animateFloatAsState(
+        targetValue = fractionOf(rain != null, rain?.dryAvgBadness ?: 0f),
+        animationSpec = barSpec,
+        label = "dry_bar",
     )
 
     Card(
@@ -524,14 +606,14 @@ private fun CorrelationInsightCard(
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Text(
-                text = "気圧 × 体調の相関",
+                text = "気圧・天気 × 体調の相関",
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurface,
             )
 
             if (insight == null) {
                 Text(
-                    text = "気圧と体調の両方が記録された日が増えると、ここに傾向が現れます。",
+                    text = "気圧・天気と体調の両方が記録された日が増えると、ここに傾向が現れます。",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     lineHeight = MaterialTheme.typography.bodySmall.fontSize * 1.6,
@@ -551,6 +633,27 @@ private fun CorrelationInsightCard(
                     barFraction = highBarFraction,
                 )
 
+                // 雨の日 vs 雨でない日（天気データが十分にある場合のみ）
+                if (rain != null) {
+                    Text(
+                        text = "天気で見ると",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    InsightBarRow(
+                        label = "雨の日",
+                        days = rain.rainyDays,
+                        badness = rain.rainyAvgBadness,
+                        barFraction = rainyBarFraction,
+                    )
+                    InsightBarRow(
+                        label = "雨でない日",
+                        days = rain.dryDays,
+                        badness = rain.dryAvgBadness,
+                        barFraction = dryBarFraction,
+                    )
+                }
+
                 // 傾向サマリー
                 Surface(
                     shape = MaterialTheme.shapes.small,
@@ -563,6 +666,22 @@ private fun CorrelationInsightCard(
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                         lineHeight = MaterialTheme.typography.bodySmall.fontSize * 1.6,
                     )
+                }
+
+                // 「低気圧かつ雨」の実用的なひとこと
+                insight.combinedNote?.let { note ->
+                    Surface(
+                        shape = MaterialTheme.shapes.small,
+                        color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.55f),
+                    ) {
+                        Text(
+                            text = note,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            lineHeight = MaterialTheme.typography.bodySmall.fontSize * 1.6,
+                        )
+                    }
                 }
 
                 Text(

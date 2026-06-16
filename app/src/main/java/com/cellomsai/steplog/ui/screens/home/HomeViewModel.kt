@@ -121,8 +121,15 @@ class HomeViewModel @Inject constructor(
     // 当日の気圧がまだ未取得のときだけ API を叩く
     private suspend fun fetchWeatherIfNeeded(today: LocalDate) {
         if (_uiState.value.record?.pressure != null) return
-        val pressure = weatherRepository.fetchPressure() ?: return
-        runCatching { repository.savePressure(today, pressure) }
+        val weather = weatherRepository.fetchWeather() ?: return
+        runCatching {
+            repository.saveWeather(
+                date = today,
+                pressure = weather.pressure,
+                precipitationMm = weather.precipitationMm,
+                weatherCode = weather.weatherCode,
+            )
+        }
     }
 
     fun onPermissionsResult(granted: Set<String>) {

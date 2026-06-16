@@ -22,14 +22,27 @@ class WeatherRepository @Inject constructor(
     private val userPreferences: UserPreferences,
     @ApplicationContext private val context: Context,
 ) {
-    suspend fun fetchPressure(): Float? {
+    /**
+     * 当日の天気（気圧・降水量・天気コード）を取得する。
+     * API キー未設定・位置情報なし・通信失敗のいずれかなら null。
+     */
+    suspend fun fetchWeather(): WeatherSnapshot? {
         val apiKey = userPreferences.weatherApiKey.first()
         if (apiKey.isEmpty()) return null
 
         val location = getLocation() ?: return null
 
         return runCatching {
-            api.getCurrentWeather(location.latitude, location.longitude, apiKey).main.pressure
+            val response = api.getCurrentWeather(location.latitude, location.longitude, apiKey)
+            // rain フィールドは降水時のみ存在。無い場合は 0.0（= 降水なし）として扱う。
+            val precipitation = response.rain?.oneHour
+                ?: response.rain?.threeHour
+                ?: 0f
+            WeatherSnapshot(
+                pressure = response.main.pressure,
+                precipitationMm = precipitation,
+                weatherCode = response.weather.firstOrNull()?.id,
+            )
         }.getOrNull()
     }
 
