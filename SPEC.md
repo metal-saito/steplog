@@ -103,6 +103,7 @@
 |---|---|---|
 | めまい度 | スライダー（整数） | 0〜5 |
 | 疲労度 | スライダー（整数） | 0〜5 |
+| 耳鳴り | スライダー（整数） | 0〜5 |
 | 睡眠時間 | スライダー（小数） | 0〜12 時間 |
 | 体重 | テキスト入力（Float） | 任意 |
 | 備考 | テキスト入力（複数行） | 任意 |
@@ -186,7 +187,7 @@
 
 - **表示条件**: 気圧と体調の両方が入力された日が **5 日以上** あること
 - **未達成時**: 「気圧・天気と体調の両方が記録された日が増えると、ここに傾向が現れます。」を静かに表示
-- **達成時**: 閾値 1005 hPa で低気圧／高気圧の日を分類し、平均不調スコア（(めまい+疲労)/2）を比較
+- **達成時**: 閾値 1005 hPa で低気圧／高気圧の日を分類し、平均不調スコア（めまい・疲労・耳鳴りのうち入力済みの平均）を比較
 
   不調スコアバー（0〜5 のスケール）が spring アニメーションで伸びる
 
@@ -243,11 +244,11 @@
 - 各日の降水量（mm）を棒グラフで表示（700ms FastOutSlow アニメーション）
 - 降水なし（0 mm）の日は最小高さ（2px）でグレー表示。天気未取得の日はバーなし
 
-### 7-7. めまい度・疲労度グラフ（カラーバー）
+### 7-7. めまい度・疲労度・耳鳴りグラフ（カラーバー）
 
 - 各日を色付きの小矩形で並べて表示
 - ConditionColors（0=緑系〜5=赤系）で体調レベルを色表現
-- 「めまい」「疲労」の 2 行
+- 「めまい」「疲労」「耳鳴り」の 3 行
 
 ---
 
@@ -268,11 +269,11 @@
 - 未連携時: 連携ボタンで HC のパーミッションリクエストを起動
 - 連携済み時: 「連携を確認・変更する」ボタン
 
-### 8-4. 気圧データ（任意）
+### 8-4. 気圧データ
 
-- **OpenWeatherMap API キー** を入力・保存
-- キーが空の場合は気圧取得を行わない（体調・歩数記録は通常通り使用可能）
-- キー登録後は位置情報（`ACCESS_COARSE_LOCATION`）を取得し、当日の気圧を自動保存
+- 気圧取得用の **API キーはアプリに内蔵**。設定画面には表示せず、ユーザーからは変更・閲覧できない
+- 位置情報（`ACCESS_COARSE_LOCATION`）を許可すると、当日の気圧を自動保存する
+- 降水量は API キー不要の Open-Meteo から取得（10-3 参照）
 
 ---
 
@@ -286,6 +287,7 @@
 | `steps` | Int | 当日の歩数（デフォルト 0） |
 | `dizzinessLevel` | Int? | めまい度 0〜5、null = 未入力 |
 | `fatigueLevel` | Int? | 疲労度 0〜5、null = 未入力 |
+| `tinnitusLevel` | Int? | 耳鳴り 0〜5、null = 未入力 |
 | `sleepHours` | Float? | 睡眠時間 0.0〜12.0 |
 | `pressure` | Float? | 気圧（hPa）|
 | `precipitationMm` | Float? | 降水量（mm）。null = 天気未取得、0 = 取得済み・降水なし |
@@ -301,7 +303,8 @@
 |---|---|---|
 | `onboarding_done` | Boolean | オンボーディング完了フラグ |
 | `app_theme` | String | テーマ設定（SYSTEM / LIGHT / DARK） |
-| `weather_api_key` | String | OpenWeatherMap API キー |
+
+> 気圧 API キーはアプリ内蔵の定数で、DataStore には保存しない（ユーザーからは変更・閲覧不可）。
 
 ---
 
@@ -321,15 +324,25 @@
 
 ### 10-3. 気圧・天気（WeatherRepository）
 
-- 外部 API: OpenWeatherMap Current Weather API
-  - エンドポイント: `api.openweathermap.org/data/2.5/weather`
-  - パラメーター: `lat`, `lon`, `appid`, `units=metric`
-- レスポンスから以下を取得して保存:
-  - `main.pressure` → `pressure`（hPa）
-  - `rain.1h`（無ければ `rain.3h`、いずれも無ければ 0）→ `precipitationMm`（mm）
-  - `weather[0].id` → `weatherCode`（天気コンディションコード）
-- ユーザー提供の API キーが必要（無料プランで取得可能）
+気圧は OpenWeatherMap（当日のみ）、降水量は Open-Meteo（過去〜当日の履歴）から取得する。
+
+#### 気圧: OpenWeatherMap Current Weather API
+
+- エンドポイント: `api.openweathermap.org/data/2.5/weather`（`main.pressure` → `pressure` hPa）
+- API キーはアプリ内蔵（ユーザー入力なし・設定画面非表示）
 - 当日の気圧が未取得のときのみ API を呼ぶ（重複取得防止）
+
+#### 降水量: Open-Meteo Forecast API
+
+- エンドポイント: `api.open-meteo.com/v1/forecast`
+  - パラメーター: `latitude`, `longitude`, `daily=precipitation_sum`, `past_days=92`, `forecast_days=1`, `timezone=auto`
+- **API キー不要・無料**（位置情報のみ）
+- 過去〜当日の日次降水量を取得し、**降水量が未記録（null）の既存レコードにだけ** 補完する（既存値は上書きしない）
+- アプリ起動時に一度だけ実行（成功するまでリトライ）
+- `weatherCode` は将来用の保持カラム（現状は降水量 > 0 で「雨」と判定）
+
+#### 共通
+
 - 位置情報: `ACCESS_COARSE_LOCATION`。キャッシュ優先・フォールバックで 5 秒以内に取得
 
 ---
@@ -410,7 +423,7 @@ DI              ─ Hilt
 ## 15. データ方針
 
 - すべての記録データは端末内 Room DB にのみ保存
-- 気圧取得のみ外部 API（OpenWeatherMap）を使用。API キーはユーザー自身が取得・登録
+- 天気取得のみ外部 API（気圧: OpenWeatherMap / 降水量: Open-Meteo）を使用。気圧の API キーはアプリ内蔵
 - データエクスポート: CSV 形式でシェアシートへ書き出し（クラウド同期機能なし）
 - データ削除: 設定画面から全件削除可能
 - 過去日の歩数は変更不可（当日のみ自動更新）

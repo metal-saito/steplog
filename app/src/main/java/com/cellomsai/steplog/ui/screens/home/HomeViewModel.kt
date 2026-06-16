@@ -118,18 +118,24 @@ class HomeViewModel @Inject constructor(
         _uiState.update { it.copy(healthConnectPermissionGranted = hasPerms) }
     }
 
-    // 当日の気圧がまだ未取得のときだけ API を叩く
+    // 当日の気圧がまだ未取得のときだけ API を叩く（気圧は OpenWeatherMap、降水量は別途 Open-Meteo で補完）
     private suspend fun fetchWeatherIfNeeded(today: LocalDate) {
-        if (_uiState.value.record?.pressure != null) return
-        val weather = weatherRepository.fetchWeather() ?: return
-        runCatching {
-            repository.saveWeather(
-                date = today,
-                pressure = weather.pressure,
-                precipitationMm = weather.precipitationMm,
-                weatherCode = weather.weatherCode,
-            )
+        if (_uiState.value.record?.pressure == null) {
+            val weather = weatherRepository.fetchWeather()
+            if (weather != null) runCatching { repository.savePressure(today, weather.pressure) }
         }
+        backfillPrecipitationHistory()
+    }
+
+    // 一度成功するまで降水量の履歴補完を試みる（Open-Meteo は API キー不要・位置情報のみ）
+    @Volatile
+    private var precipitationBackfilled = false
+
+    private suspend fun backfillPrecipitationHistory() {
+        if (precipitationBackfilled) return
+        val map = weatherRepository.fetchPrecipitationHistory() ?: return
+        runCatching { repository.backfillPrecipitation(map) }
+            .onSuccess { precipitationBackfilled = true }
     }
 
     fun onPermissionsResult(granted: Set<String>) {
@@ -202,6 +208,7 @@ class HomeViewModel @Inject constructor(
     fun saveBodyCondition(
         dizzinessLevel: Int?,
         fatigueLevel: Int?,
+        tinnitusLevel: Int?,
         sleepHours: Float?,
         weightKg: Float?,
         memo: String?,
@@ -210,7 +217,7 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true, errorMessage = null) }
             runCatching {
-                repository.saveBodyCondition(today, dizzinessLevel, fatigueLevel, sleepHours, weightKg, memo)
+                repository.saveBodyCondition(today, dizzinessLevel, fatigueLevel, tinnitusLevel, sleepHours, weightKg, memo)
             }.onSuccess {
                 _uiState.update { it.copy(isSaving = false, savedToastVisible = true) }
             }.onFailure {

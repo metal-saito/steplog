@@ -28,6 +28,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Air
+import androidx.compose.material.icons.outlined.WaterDrop
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -272,6 +273,7 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
                         PressureChip(
                             pressure = pressure,
                             trend = pressureTrend(pressure, uiState.yesterdayPressure),
+                            precipitationMm = uiState.record?.precipitationMm,
                         )
                     }
                 }
@@ -380,12 +382,13 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
                     BodyConditionInput(
                         initialDizziness = uiState.record?.dizzinessLevel,
                         initialFatigue = uiState.record?.fatigueLevel,
+                        initialTinnitus = uiState.record?.tinnitusLevel,
                         initialSleepHours = uiState.record?.sleepHours ?: 7f,
                         initialWeightKg = uiState.record?.weightKg,
                         initialMemo = uiState.record?.memo ?: "",
                         isSaving = uiState.isSaving,
-                        onSave = { dizziness, fatigue, sleep, weightKg, memo ->
-                            viewModel.saveBodyCondition(dizziness, fatigue, sleep, weightKg, memo)
+                        onSave = { dizziness, fatigue, tinnitus, sleep, weightKg, memo ->
+                            viewModel.saveBodyCondition(dizziness, fatigue, tinnitus, sleep, weightKg, memo)
                         },
                     )
                 }
@@ -409,7 +412,7 @@ private fun pressureTrend(today: Float, yesterday: Float?): PressureTrend? {
 }
 
 @Composable
-private fun PressureChip(pressure: Float, trend: PressureTrend?) {
+private fun PressureChip(pressure: Float, trend: PressureTrend?, precipitationMm: Float?) {
     Surface(
         shape = MaterialTheme.shapes.small,
         color = MaterialTheme.colorScheme.surfaceVariant,
@@ -441,6 +444,25 @@ private fun PressureChip(pressure: Float, trend: PressureTrend?) {
                         text = "$symbol $label",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            // 気圧と同じ高さで降水量も表示（取得済みのときのみ）
+            if (precipitationMm != null) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.WaterDrop,
+                        contentDescription = "降水量",
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = if (precipitationMm > 0f) "%.1f mm".format(precipitationMm) else "降水なし",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                 }
             }

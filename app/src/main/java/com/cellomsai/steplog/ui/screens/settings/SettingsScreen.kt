@@ -20,8 +20,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -214,35 +212,6 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                     ) {
                         Text(if (uiState.healthConnectConnected) "連携を確認・変更する" else "Health Connect と連携する")
                     }
-                }
-            }
-
-            // 気圧データ設定
-            SettingsSection(title = "気圧データ（任意）") {
-                Text(
-                    text = "メニエール病では気圧の変化が症状に影響することがあります。OpenWeatherMap の無料 API キーを登録すると、記録時に気圧データが自動で付加されます。\n\n登録しない場合も歩数・体調の記録は通常通り使えます。",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                OutlinedTextField(
-                    value = uiState.weatherApiKey,
-                    onValueChange = { viewModel.onApiKeyChange(it) },
-                    label = { Text("OpenWeatherMap API キー") },
-                    placeholder = { Text("任意") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                    ),
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Button(
-                    onClick = { viewModel.saveApiKey() },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("保存")
                 }
             }
 

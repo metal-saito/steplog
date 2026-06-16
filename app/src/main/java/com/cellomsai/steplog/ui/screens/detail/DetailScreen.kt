@@ -84,18 +84,27 @@ fun DetailScreen(
             BodyConditionInput(
                 initialDizziness = uiState.record?.dizzinessLevel,
                 initialFatigue = uiState.record?.fatigueLevel,
+                initialTinnitus = uiState.record?.tinnitusLevel,
                 initialSleepHours = uiState.record?.sleepHours ?: 7f,
                 initialWeightKg = uiState.record?.weightKg,
                 initialMemo = uiState.record?.memo ?: "",
                 isSaving = uiState.isSaving,
-                onSave = { dizziness, fatigue, sleep, weightKg, memo ->
-                    viewModel.save(dizziness, fatigue, sleep, weightKg, memo)
+                onSave = { dizziness, fatigue, tinnitus, sleep, weightKg, memo ->
+                    viewModel.save(dizziness, fatigue, tinnitus, sleep, weightKg, memo)
                 },
             )
 
             uiState.record?.pressure?.let { pressure ->
                 Text(
                     text = "気圧 %.1f hPa".format(pressure),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            uiState.record?.precipitationMm?.let { mm ->
+                Text(
+                    text = if (mm > 0f) "降水量 %.1f mm".format(mm) else "降水量 なし",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

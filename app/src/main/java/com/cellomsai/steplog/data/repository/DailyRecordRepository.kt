@@ -32,6 +32,7 @@ class DailyRecordRepository @Inject constructor(
         date: LocalDate,
         dizzinessLevel: Int?,
         fatigueLevel: Int?,
+        tinnitusLevel: Int?,
         sleepHours: Float?,
         weightKg: Float?,
         memo: String?,
@@ -41,6 +42,7 @@ class DailyRecordRepository @Inject constructor(
             date = date.toString(),
             dizziness = dizzinessLevel,
             fatigue = fatigueLevel,
+            tinnitus = tinnitusLevel,
             sleep = sleepHours,
             memo = memo,
             weightKg = weightKg,
@@ -51,6 +53,7 @@ class DailyRecordRepository @Inject constructor(
                 date = date.toString(),
                 dizzinessLevel = dizzinessLevel,
                 fatigueLevel = fatigueLevel,
+                tinnitusLevel = tinnitusLevel,
                 sleepHours = sleepHours,
                 memo = memo,
                 weightKg = weightKg,
@@ -81,6 +84,20 @@ class DailyRecordRepository @Inject constructor(
                 weatherCode = weatherCode,
             )
         )
+    }
+
+    /**
+     * 取得済みの日次降水量を、まだ降水量が未記録（null）の既存レコードにだけ書き込む。
+     * 該当日のレコードが無い場合・既に降水量がある場合は何もしない。
+     * @return 補完できた日数
+     */
+    suspend fun backfillPrecipitation(precipitationByDate: Map<String, Float>): Int {
+        val now = System.currentTimeMillis()
+        var filled = 0
+        precipitationByDate.forEach { (date, mm) ->
+            filled += dao.fillPrecipitationIfMissing(date, mm, now)
+        }
+        return filled
     }
 
     suspend fun upsertAll(records: List<DailyRecord>) = dao.upsertAll(records)

@@ -9,6 +9,7 @@ data class DailyRecord(
     val steps: Int = 0,
     val dizzinessLevel: Int? = null,        // 0-5, null = not entered
     val fatigueLevel: Int? = null,          // 0-5
+    val tinnitusLevel: Int? = null,         // 0-5 (耳鳴り), null = not entered
     val sleepHours: Float? = null,          // 0.0-12.0
     val pressure: Float? = null,            // morning pressure in hPa
     val precipitationMm: Float? = null,     // precipitation (mm); null = not fetched, 0 = fetched & dry
