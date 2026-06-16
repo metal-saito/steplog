@@ -1,5 +1,11 @@
 package com.cellomsai.steplog.ui.screens.graph
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -30,6 +36,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -267,15 +274,23 @@ private fun StepsBarChart(
     emptyColor: Color,
     modifier: Modifier = Modifier,
 ) {
+    val animProgress = remember { Animatable(0f) }
+    LaunchedEffect(steps) {
+        animProgress.snapTo(0f)
+        animProgress.animateTo(1f, animationSpec = tween(700, easing = FastOutSlowInEasing))
+    }
+
     Canvas(modifier = modifier) {
         if (steps.isEmpty()) return@Canvas
+        val p = animProgress.value
         val maxSteps = steps.max().coerceAtLeast(1)
         val n = steps.size
         val slotWidth = size.width / n
         val barWidth = (slotWidth * 0.6f).coerceAtLeast(2f)
 
         steps.forEachIndexed { i, s ->
-            val barHeight = if (s > 0) (s.toFloat() / maxSteps) * size.height else 2f
+            val fullHeight = if (s > 0) (s.toFloat() / maxSteps) * size.height else 2f
+            val barHeight = if (s > 0) (fullHeight * p).coerceAtLeast(0f) else 2f
             val left = i * slotWidth + (slotWidth - barWidth) / 2f
             drawRect(
                 color = if (s > 0) barColor.copy(alpha = 0.75f) else emptyColor,
@@ -323,6 +338,12 @@ private fun LineChart(
     val maxValue = points.maxOf { it.second }
     val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
 
+    val revealProgress = remember { Animatable(0f) }
+    LaunchedEffect(points) {
+        revealProgress.snapTo(0f)
+        revealProgress.animateTo(1f, animationSpec = tween(900, easing = FastOutSlowInEasing))
+    }
+
     Row(modifier = modifier) {
         // 左側に最大値・最小値の目盛りラベル（読みやすさ向上）
         Column(
@@ -346,6 +367,7 @@ private fun LineChart(
         Spacer(modifier = Modifier.width(8.dp))
         Canvas(modifier = Modifier.weight(1f).fillMaxHeight()) {
             val range = (maxValue - minValue).coerceAtLeast(1f)
+            val clipWidth = size.width * revealProgress.value
 
             fun xOf(index: Int) = if (totalDays <= 1) size.width / 2f
                 else (index.toFloat() / (totalDays - 1)) * size.width
@@ -353,14 +375,22 @@ private fun LineChart(
             fun yOf(value: Float) =
                 size.height - ((value - minValue) / range) * size.height * 0.85f - size.height * 0.075f
 
-            // 記録のある点同士だけを線でつなぐ（欠損日はまたいでつなぐ）
+            // 記録のある点同士だけを線でつなぐ。アニメーション中は clipWidth で線を途中でカット。
             for (i in 0 until points.size - 1) {
                 val (idxA, vA) = points[i]
                 val (idxB, vB) = points[i + 1]
+                val xA = xOf(idxA)
+                val yA = yOf(vA)
+                val xB = xOf(idxB)
+                val yB = yOf(vB)
+                if (xA > clipWidth) continue
+                val endX = xB.coerceAtMost(clipWidth)
+                val t = if (xB > xA) (endX - xA) / (xB - xA) else 1f
+                val endY = yA + (yB - yA) * t
                 drawLine(
                     color = lineColor.copy(alpha = 0.8f),
-                    start = Offset(xOf(idxA), yOf(vA)),
-                    end = Offset(xOf(idxB), yOf(vB)),
+                    start = Offset(xA, yA),
+                    end = Offset(endX, endY),
                     strokeWidth = 3.dp.toPx(),
                     cap = StrokeCap.Round,
                 )
@@ -368,11 +398,14 @@ private fun LineChart(
 
             val dotRadius = 4.dp.toPx()
             points.forEach { (idx, v) ->
-                drawCircle(
-                    color = dotColor,
-                    radius = dotRadius,
-                    center = Offset(xOf(idx), yOf(v)),
-                )
+                val x = xOf(idx)
+                if (x <= clipWidth + dotRadius) {
+                    drawCircle(
+                        color = dotColor,
+                        radius = dotRadius,
+                        center = Offset(x, yOf(v)),
+                    )
+                }
             }
         }
     }
@@ -422,9 +455,66 @@ private fun ConditionChart(
 }
 
 @Composable
+private fun InsightBarRow(
+    label: String,
+    days: Int,
+    badness: Float,
+    barFraction: Float,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = "${days}日  不調 %.1f".format(badness),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(12.dp)
+                .background(
+                    MaterialTheme.colorScheme.surfaceVariant,
+                    RoundedCornerShape(6.dp),
+                ),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(barFraction)
+                    .height(12.dp)
+                    .background(
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.65f),
+                        RoundedCornerShape(6.dp),
+                    ),
+            )
+        }
+    }
+}
+
+@Composable
 private fun CorrelationInsightCard(
     insight: CorrelationInsight?,
 ) {
+    val lowBarFraction by animateFloatAsState(
+        targetValue = if (insight != null) (insight.lowPressureAvgBadness / 5f).coerceIn(0f, 1f) else 0f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+        label = "low_bar",
+    )
+    val highBarFraction by animateFloatAsState(
+        targetValue = if (insight != null) (insight.highPressureAvgBadness / 5f).coerceIn(0f, 1f) else 0f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+        label = "high_bar",
+    )
+
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
@@ -448,48 +538,18 @@ private fun CorrelationInsightCard(
                 )
             } else {
                 // 低気圧 vs 高気圧 の不調スコアバー比較
-                listOf(
-                    Triple("低気圧  〜 ${insight.threshold.toInt()} hPa", insight.lowPressureDays, insight.lowPressureAvgBadness),
-                    Triple("高気圧  ${insight.threshold.toInt()} hPa 〜", insight.highPressureDays, insight.highPressureAvgBadness),
-                ).forEach { (label, days, badness) ->
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                text = label,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Text(
-                                text = "${days}日  不調 %.1f".format(badness),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurface,
-                            )
-                        }
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(12.dp)
-                                .background(
-                                    MaterialTheme.colorScheme.surfaceVariant,
-                                    RoundedCornerShape(6.dp),
-                                ),
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth((badness / 5f).coerceIn(0f, 1f))
-                                    .height(12.dp)
-                                    .background(
-                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.65f),
-                                        RoundedCornerShape(6.dp),
-                                    ),
-                            )
-                        }
-                    }
-                }
+                InsightBarRow(
+                    label = "低気圧  〜 ${insight.threshold.toInt()} hPa",
+                    days = insight.lowPressureDays,
+                    badness = insight.lowPressureAvgBadness,
+                    barFraction = lowBarFraction,
+                )
+                InsightBarRow(
+                    label = "高気圧  ${insight.threshold.toInt()} hPa 〜",
+                    days = insight.highPressureDays,
+                    badness = insight.highPressureAvgBadness,
+                    barFraction = highBarFraction,
+                )
 
                 // 傾向サマリー
                 Surface(

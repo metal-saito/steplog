@@ -1,316 +1,382 @@
-# StepLog — 機能仕様書
+# 気圧ノート — アプリ仕様書
 
-> バージョン: 0.1.0  
-> 対象 OS: Android 8.0（API 26）以上  
-> 設計思想: 「歩け」と言わないアプリ。メニエール病患者が無理なく続けられる、記録のためだけの日誌。
+## 1. アプリ概要
+
+| 項目 | 内容 |
+|---|---|
+| アプリ名 | 気圧ノート |
+| パッケージ名 | com.cellomsai.steplog |
+| 対象プラットフォーム | Android |
+| 最小 SDK | API 26（Android 8.0） |
+| ターゲット SDK | API 35 |
+
+### コンセプト
+
+「気圧と体調のつながりを記録して、あなただけのパターンを見つけるアプリ」
+
+- 気圧の変化（低気圧・高気圧）と、めまい・疲労感・睡眠・体重の相関を可視化する
+- **「歩けと言わない」** — 歩数目標の押し付けや、行動を促すような文言は一切使わない
+- 事実を静かに記録・提示することに徹し、ユーザーを急かさない
+- データはすべて端末内（Room DB）に保存。外部送信はしない（気圧取得 API を除く）
 
 ---
 
-## 目次
-
-1. [画面構成](#1-画面構成)
-2. [機能仕様](#2-機能仕様)
-3. [データ仕様](#3-データ仕様)
-4. [技術スタック](#4-技術スタック)
-5. [アーキテクチャ](#5-アーキテクチャ)
-6. [権限](#6-権限)
-7. [テーマ・デザイン](#7-テーマデザイン)
-8. [外部連携](#8-外部連携)
-9. [ビルド](#9-ビルド)
-
----
-
-## 1. 画面構成
+## 2. 画面構成
 
 ```
-BottomNavigationBar
-├── 今日 (HomeScreen)
-├── カレンダー (CalendarScreen)
-├── グラフ (GraphScreen)
-└── 設定 (SettingsScreen)
+起動
+ └─ スプラッシュ画面（SplashScreen API）
+      ├─ オンボーディング（初回のみ）4ページ
+      └─ メイン画面
+           ├─ ホーム（今日）     … BottomBar タブ 1
+           ├─ カレンダー         … BottomBar タブ 2
+           │    └─ 日付詳細      … カレンダーセルをタップで遷移
+           ├─ グラフ             … BottomBar タブ 3
+           └─ 設定               … BottomBar タブ 4
 ```
 
 ---
 
-## 2. 機能仕様
+## 3. オンボーディング
 
-### 2.1 今日画面 (HomeScreen)
+- 初回起動時のみ表示。DataStore に完了フラグ（`onboarding_done`）を保存し、以降はスキップ
+- `HorizontalPager` による 4 ページ構成。任意のページで「スキップ」可能
+- 最終ページのみ「はじめる」ボタンを表示
+- ページインジケーター: 選択中は幅 24dp・未選択は 8dp のピル型ドット（spring アニメーション）
 
-#### 歩数表示
-- 画面中央に本日の歩数を大きく表示
-- プルダウン（PullToRefresh）で手動更新可能
-- 取得中はローディングインジケーター表示
+### ページ内容
 
-#### 気圧表示
-- TopAppBar 右端: `⇌ 1006 hPa`（スクロールしても常に表示）
-- 歩数直下: `⇌ 気圧 1006.0 hPa` チップ（surfaceVariant カード）
-- 気圧未取得時はどちらも非表示
-
-#### 体調入力フォーム
-| 項目 | 型 | 範囲 | 備考 |
-|------|----|------|------|
-| めまい度 | Int | 0〜5 | 穏やか/少し/やや/気になる/つらい/とてもつらい |
-| 疲労度 | Int | 0〜5 | 同上 |
-| 睡眠時間 | Float | 0.0〜12.0 h | 0.5h 刻みスライダー |
-| メモ | String | 任意 | フリーテキスト |
-
-- 「記録する」ボタンで保存、Snackbar で「記録しました」表示
-- 記録済みの日は前回値をフォームに復元
-
-#### 権限ガイダンスカード
-| 条件 | 表示内容 |
-|------|----------|
-| センサーあり・ACTIVITY_RECOGNITION 未許可 | 「歩数センサーを許可する」ボタン |
-| センサーなし・Health Connect 未接続 | 「Health Connect に接続する」ボタン |
-| センサーなし・HC 接続済みだが歩数 0 | HC のデータソース設定手順を案内 |
+| ページ | アイコン | タイトル | 本文 |
+|---|---|---|---|
+| 1 | Air | 低気圧のとき、体調が変わりませんか？ | 頭痛・めまい・だるさと気圧の関係を記録してパターンを発見 |
+| 2 | WbSunny | 気圧は自動で記録 | 位置情報から毎日の気圧を自動取得 |
+| 3 | FavoriteBorder | 体調・体重を毎日記録 | めまい・疲労感・睡眠・体重をカンタン入力 |
+| 4 | BarChart | 相関グラフで傾向を把握 | 低気圧と不調が重なるパターンをグラフで可視化 |
 
 ---
 
-### 2.2 カレンダー画面 (CalendarScreen)
+## 4. ホーム画面（今日）
 
-- 月次カレンダー表示
-- 各日のセルにめまい度・疲労度を色で可視化（ConditionColors: 緑→橙→赤）
-- タップで詳細画面へ遷移
+今日の記録を確認・入力するメイン画面。
 
-#### 詳細画面 (DetailScreen)
-- 選択日の全データ表示（歩数・各体調スコア・睡眠時間・気圧・メモ）
-- 気圧が記録されていれば `気圧 XXXX.X hPa` を表示
+### 4-1. ヘッダー
+
+- **日付表示**（TopAppBar タイトル）: `yyyy年M月d日 (E)` 形式
+- **気圧表示**（TopAppBar アクション）: 気圧データがある場合のみ `xxx hPa` を表示
+
+### 4-2. 歩数リング（StepsDisplay）
+
+- 直径 200dp の円弧プログレスリング（目標: 10,000 歩）
+- 中央に歩数カウンター（数字アニメーション付き）
+- 10,000 歩未満: ラベル「歩」、リング色 `primary`
+- 10,000 歩達成: ラベル「目標達成」、リング色 `tertiary`（1.2 秒かけてカラーアニメーション）
+- 初回表示時に 0.72x → 1.0x のスケールバウンスアニメーション
+
+### 4-3. 気圧チップ
+
+- 気圧データがある日のみ `AnimatedVisibility` でフェード＋展開表示
+- 表示内容: 気圧値 `xxx.x hPa` ＋ 昨日との比較トレンド
+
+| 条件 | 表示 |
+|---|---|
+| 今日 − 昨日 > 2 hPa | ↑ 昨日より上昇 |
+| 今日 − 昨日 < −2 hPa | ↓ 昨日より下降 |
+| その他 | → 昨日とほぼ同じ |
+| 昨日のデータなし | トレンド非表示 |
+
+### 4-4. 気圧インサイトメッセージ
+
+- 低気圧・急落時のみ穏やかなコンテキストメッセージを表示（`AnimatedVisibility`）
+
+| 条件 | メッセージ |
+|---|---|
+| 下降中 かつ 気圧 < 1000 hPa | 気圧が急激に下がっています。体調に変化があれば記録してみましょう。 |
+| 下降中（1000 hPa 以上） | 気圧が下がり気味です。体調の変化を気にしながら過ごしてみましょう。 |
+| 安定 かつ 気圧 < 998 hPa | 低気圧が続いています。体調の変化を記録しておくと、あとで傾向が見えます。 |
+| その他 | 表示なし |
+
+### 4-5. 体調入力フォーム（BodyConditionInput）
+
+200ms 遅延後にスライドアップ＋フェードで登場。
+
+| 入力項目 | 型 | 範囲 |
+|---|---|---|
+| めまい度 | スライダー（整数） | 0〜5 |
+| 疲労度 | スライダー（整数） | 0〜5 |
+| 睡眠時間 | スライダー（小数） | 0〜12 時間 |
+| 体重 | テキスト入力（Float） | 任意 |
+| 備考 | テキスト入力（複数行） | 任意 |
+
+- 「記録する」ボタンで保存。保存完了時に Snackbar 表示
+- 当日の歩数は「記録する」を押しても上書き保存し続ける（歩数は減らない）
+
+### 4-6. 歩数取得ロジック
+
+優先順位:
+
+1. **歩数センサー優先**: `ACTIVITY_RECOGNITION` 許可あり＋センサー搭載 → `StepSensorManager` で読み取り（Health Connect の値を seed として差分加算）
+2. **Health Connect**: センサー不可 → `HealthConnectManager` で当日歩数を読み取り
+3. **どちらも不可**: 歩数取得なし
+
+- 4 秒ごとにバックグラウンドポーリング（`showLoading = false` でスピナー非表示）
+- 引き下げ更新（Pull-to-refresh）でも歩数を再取得
+- 当日歩数は単調増加（DB 保存値とライブ値の大きい方を表示）
+
+### 4-7. 権限・連携ガイダンス
+
+歩数が 0 のとき、状況に応じたガイダンスカードを表示:
+
+| 状況 | カード内容 |
+|---|---|
+| センサーあり・ACTIVITY_RECOGNITION 未許可 | 歩数センサーを許可するよう誘導 |
+| センサーなし・HC 未接続 | Health Connect への接続を誘導 |
+| センサーなし・HC 接続済み・データなし | Google Fit の HC 同期設定を案内 |
+| HC 接続済みだが HC 歩数 0・センサーあり・歩数 < 500 | Google Fit / OPPO ヘルスの HC 連携を案内 |
 
 ---
 
-### 2.3 グラフ画面 (GraphScreen)
+## 5. カレンダー画面
 
-- 期間選択: 7日 / 30日 / 90日
-- サマリーカード: 平均歩数・体調記録日数
-- 歩数棒グラフ（Vico Charts）
-- めまい度・疲労度の水平バーチャート
+月単位でデータを俯瞰するカレンダービュー。
 
----
-
-### 2.4 設定画面 (SettingsScreen)
-
-#### 外観
-- テーマ切替: システム / ライト / ダーク（SegmentedButton）
-- DataStore に永続化
-
-#### データ
-- **CSV を共有する**: 全記録を CSV 形式で書き出し、Android 共有シートを開く
-  - 出力先: キャッシュディレクトリ（FileProvider 経由）
-  - ファイル名: `steplog_YYYY-MM-DD.csv`
-  - カラム: `date, steps, dizziness_level, fatigue_level, sleep_hours, pressure, memo`
-- **データをすべて削除**: 確認ダイアログ付き
-
-#### 気圧データ（任意）
-- OpenWeatherMap API キーの登録・変更
-- デフォルトキーがプリセット済みのためそのまま利用可能
-- 未入力でも歩数・体調記録は通常通り動作
-
-#### 情報
-- アプリの理念を表示
+- ヘッダーに `◀ yyyy年M月 ▶` ナビゲーション
+- 週始まりは日曜日
+- 各セルに表示:
+  - 日付数字
+  - 歩数（1000 歩以上は `Nk` 形式、未入力は非表示）
+  - めまい度に対応した色のドット（ConditionColors: 0〜5 の 6 段階）
+- 今日のセルに枠線（outline）
+- 未来日はタップ不可（薄表示）
+- セルをタップすると日付詳細画面へ遷移
 
 ---
 
-## 3. データ仕様
+## 6. 日付詳細画面
 
-### 3.1 DB エンティティ（Room）
+カレンダーから選択した日の詳細を表示・編集する画面。
 
-**テーブル: `daily_records`**
+- 下から上にスライド＋フェードで登場（モーダル風）
+- `StepsDisplay`（その日の歩数リング表示）
+- `BodyConditionInput`（体調・体重・備考の編集）
+- 気圧値（hPa）テキスト表示
+- 過去日の歩数は変更不可（捏造防止。フォームからは体調・体重・備考のみ保存）
 
-| カラム | 型 | デフォルト | 説明 |
-|--------|----|-----------|------|
-| `date` | TEXT (PK) | — | `yyyy-MM-dd` |
-| `steps` | INT | 0 | 当日の歩数 |
-| `dizzinessLevel` | INT? | null | 0〜5, null=未入力 |
-| `fatigueLevel` | INT? | null | 0〜5, null=未入力 |
-| `sleepHours` | REAL? | null | 0.0〜12.0 |
-| `pressure` | REAL? | null | 気圧 (hPa) |
-| `memo` | TEXT? | null | フリーテキスト |
-| `createdAt` | INT | now | Unix ミリ秒 |
-| `updatedAt` | INT | now | Unix ミリ秒 |
+---
 
-### 3.2 DataStore (UserPreferences)
+## 7. グラフ画面
 
-| キー | 型 | デフォルト | 説明 |
-|------|----|-----------|------|
-| `theme` | String | `"SYSTEM"` | `SYSTEM` / `LIGHT` / `DARK` |
-| `weather_api_key` | String | プリセット済み | OpenWeatherMap API キー |
-| `step_date` | String | `""` | 歩数計測中の日付 |
-| `step_last_sensor` | Long | 0 | 最後に処理した累計センサー値（再起動検知用） |
-| `step_daily_total` | Int | 0 | 当日のここまでの累計歩数 |
+期間を選んで各データのグラフを確認する画面。
 
-### 3.3 歩数の差分蓄積方式（再起動・終了に強い）
+### 7-1. 期間選択
 
-`TYPE_STEP_COUNTER` センサーは**端末起動からの累計値**を返し、**端末再起動で 0 にリセット**される。
-そのため「最後に見たセンサー値」と「当日累計」を保持し、差分を加算していく方式を採用する。
+`SingleChoiceSegmentedButtonRow` で切り替え。切り替えるとすべてのグラフが再アニメーション。
+
+| ラベル | 期間 |
+|---|---|
+| 7日 | 直近 7 日間 |
+| 30日 | 直近 30 日間 |
+| 90日 | 直近 90 日間 |
+
+### 7-2. サマリーカード
+
+- **平均歩数**: 歩数 > 0 の日の平均
+- **体調記録日数**: めまい度または疲労度が記録されている日数
+
+### 7-3. 気圧 × 体調の相関カード（最上位表示）
+
+- **表示条件**: 気圧と体調の両方が入力された日が **5 日以上** あること
+- **未達成時**: 「気圧と体調の両方が記録された日が増えると、ここに傾向が現れます。」を静かに表示
+- **達成時**: 閾値 1005 hPa で低気圧／高気圧の日を分類し、平均不調スコア（(めまい+疲労)/2）を比較
+
+  不調スコアバー（0〜5 のスケール）が spring アニメーションで伸びる
+
+  | diff（低気圧 − 高気圧） | サマリーテキスト |
+  |---|---|
+  | > 0.5 | 低気圧の日は不調スコアが N.N 高い傾向があります |
+  | < −0.5 | 高気圧の日のほうが不調になりやすい傾向があります |
+  | その他 | 気圧と体調の明確な相関は今のところ見られません |
+
+  フッターに「N 日分のデータをもとに集計」を表示
+
+### 7-4. 歩数グラフ（棒グラフ）
+
+- 各日の歩数を棒グラフで表示
+- グラフ表示時にバーが下から上へアニメーション（700ms、FastOutSlow）
+- 歩数 0 の日は最小高さ（2px）でグレー表示
+
+### 7-5. 体重グラフ（折れ線グラフ）
+
+- 記録のある日同士を直線でつなぐ（欠損日はまたいで連結）
+- グラフ表示時に線が左から右へ描画アニメーション（900ms）
+- 左軸に最大値・最小値ラベル（小数第 1 位）
+- ドットは描画アニメーション進捗に連動して出現
+
+### 7-6. 気圧グラフ（折れ線グラフ）
+
+- 体重グラフと同仕様（単位: hPa、小数第 0 位）
+
+### 7-7. めまい度・疲労度グラフ（カラーバー）
+
+- 各日を色付きの小矩形で並べて表示
+- ConditionColors（0=緑系〜5=赤系）で体調レベルを色表現
+- 「めまい」「疲労」の 2 行
+
+---
+
+## 8. 設定画面
+
+### 8-1. 外観
+
+- テーマ切替: システム / ライト / ダーク（DataStore 永続化）
+
+### 8-2. データ
+
+- **CSV 書き出し**: 全記録を CSV ファイルに書き出してシェアシートを開く
+- **データ削除**: 確認ダイアログ後に全データを削除
+
+### 8-3. Health Connect 連携（任意）
+
+- HC が利用可能な端末のみ表示
+- 未連携時: 連携ボタンで HC のパーミッションリクエストを起動
+- 連携済み時: 「連携を確認・変更する」ボタン
+
+### 8-4. 気圧データ（任意）
+
+- **OpenWeatherMap API キー** を入力・保存
+- キーが空の場合は気圧取得を行わない（体調・歩数記録は通常通り使用可能）
+- キー登録後は位置情報（`ACCESS_COARSE_LOCATION`）を取得し、当日の気圧を自動保存
+
+---
+
+## 9. データモデル
+
+### DailyRecord（Room テーブル: `daily_records`）
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| `date` | String (PK) | `"yyyy-MM-dd"` |
+| `steps` | Int | 当日の歩数（デフォルト 0） |
+| `dizzinessLevel` | Int? | めまい度 0〜5、null = 未入力 |
+| `fatigueLevel` | Int? | 疲労度 0〜5、null = 未入力 |
+| `sleepHours` | Float? | 睡眠時間 0.0〜12.0 |
+| `pressure` | Float? | 気圧（hPa）|
+| `memo` | String? | 備考 |
+| `weightKg` | Float? | 体重（kg）|
+| `createdAt` | Long | 作成タイムスタンプ |
+| `updatedAt` | Long | 更新タイムスタンプ |
+
+### UserPreferences（DataStore）
+
+| キー | 型 | 説明 |
+|---|---|---|
+| `onboarding_done` | Boolean | オンボーディング完了フラグ |
+| `app_theme` | String | テーマ設定（SYSTEM / LIGHT / DARK） |
+| `weather_api_key` | String | OpenWeatherMap API キー |
+
+---
+
+## 10. 外部連携
+
+### 10-1. 歩数センサー（StepSensorManager）
+
+- `TYPE_STEP_COUNTER` センサーを使用
+- 端末起動からの累積歩数をセンサーから取得し、今日分の差分を計算
+- `ACTIVITY_RECOGNITION` パーミッション必須
+
+### 10-2. Health Connect（HealthConnectManager）
+
+- 読み取り: `StepsRecord`（当日 00:00〜現在）
+- 書き込み: なし（読み取り専用）
+- 端末に HC がインストールされていない場合は連携セクションを非表示
+
+### 10-3. 気圧（WeatherRepository）
+
+- 外部 API: OpenWeatherMap Current Weather API
+  - エンドポイント: `api.openweathermap.org/data/2.5/weather`
+  - パラメーター: `lat`, `lon`, `appid`, `units=metric`
+- ユーザー提供の API キーが必要（無料プランで取得可能）
+- 当日の気圧が未取得のときのみ API を呼ぶ（重複取得防止）
+- 位置情報: `ACCESS_COARSE_LOCATION`。キャッシュ優先・フォールバックで 5 秒以内に取得
+
+---
+
+## 11. アーキテクチャ
 
 ```
-読み取りごと (readTodaySteps):
-1. 日付が変わった（state.date != today）:
-   → state = (today, current, 0), 返値 = 0  （新しい日の起点）
-
-2. 通常時（current >= lastSensor）:
-   → delta = current - lastSensor
-   → dailyTotal += delta
-   → state = (today, current, dailyTotal), 返値 = dailyTotal
-
-3. 再起動検知（current < lastSensor）:
-   → delta = current  （current 自体が再起動後の歩数）
-   → dailyTotal += delta   ← リセットせず加算
-   → state = (today, current, dailyTotal), 返値 = dailyTotal
-
-4. センサー読み取り失敗:
-   → 当日なら保存済み dailyTotal を返す（0 で上書きしない）
+UI Layer        ─ Jetpack Compose + ViewModel (StateFlow)
+Domain Layer    ─ Repository パターン
+Data Layer      ─ Room DB / DataStore / Health Connect / Sensor / Weather API
+DI              ─ Hilt
 ```
 
-- **当日累計は減らない**ため、アプリ終了・端末再起動をまたいでも記録済み歩数が消えない。
-- read-modify-write は `Mutex` で直列化し、並列呼び出しによる二重加算を防止。
-- `refreshSteps()` は読み取り失敗（null）時に DB を保存しない（0 上書き防止）。
-
-**既知の制約:** アプリを完全終了したまま歩き、その途中で端末を再起動した場合、
-「最後の読み取り〜再起動」間の歩数は復元できない（センサーがリセットされ、
-バックグラウンドで読み取っていないため）。完全な常時計測が必要な場合は
-Health Connect 連携または前面サービスが必要。
+- MVVM アーキテクチャ
+- 単方向データフロー（`StateFlow` → Compose UI → イベント → ViewModel）
+- `@HiltViewModel` + `@AndroidEntryPoint`
 
 ---
 
-## 4. 技術スタック
+## 12. ナビゲーション・アニメーション
 
-| カテゴリ | ライブラリ / バージョン |
-|----------|------------------------|
-| 言語 | Kotlin 2.0.21 |
-| UI | Jetpack Compose + Material 3 |
-| ナビゲーション | Navigation Compose |
-| DI | Hilt (Dagger Hilt) |
-| DB | Room |
-| 設定永続化 | DataStore Preferences |
-| 非同期 | Kotlin Coroutines + Flow |
-| グラフ | Vico Charts |
-| HTTP | Retrofit 2 + Gson converter + OkHttp Logging |
-| 歩数センサー | Android `TYPE_STEP_COUNTER` (ハードウェアセンサー) |
-| 気圧 | OpenWeatherMap Current Weather API |
-| 位置情報 | Android `LocationManager` (粗い精度) |
-| 歩数バックアップ | Health Connect (フォールバック) |
-| ビルドツール | AGP 8.9.1 / Gradle 8.11.1 |
-| Java 互換 | Java 17 + Core Library Desugaring |
-| compileSdk | 36 |
-| minSdk | 26 (Android 8.0) |
-| targetSdk | 34 |
+### タブ遷移（BottomNav）
 
----
+- タブ順に応じて左右スライド（1/3 オフセット）＋フェード（300ms）
+- 方向: 右タブへ移動 → 右からスライドイン
 
-## 5. アーキテクチャ
+### 詳細画面
 
-```
-UI Layer
-├── HomeScreen        ← HomeViewModel
-├── CalendarScreen    ← CalendarViewModel
-├── GraphScreen       ← GraphViewModel
-└── SettingsScreen    ← SettingsViewModel
+- 下から上へスライド＋フェード（340ms）でオープン
+- 上から下へスライド＋フェード（280ms）でクローズ
 
-Domain / Data Layer
-├── DailyRecordRepository   ← DailyRecordDao (Room)
-├── UserPreferences         ← DataStore
-├── StepSensorManager       ← TYPE_STEP_COUNTER sensor
-├── WeatherRepository       ← WeatherApiService (Retrofit)
-└── HealthConnectManager    ← Health Connect SDK
-```
+### 各種 UI アニメーション
 
-- MVVM パターン
-- `StateFlow<UiState>` で UI に状態を流す
-- `@HiltViewModel` + `@Singleton` で依存注入
-- 各 save 操作は **列単位の SQL UPDATE** (`updateSteps` / `updatePressure` / `updateBodyCondition`) を使い、並列実行時のレースコンディションを防止
+| 要素 | アニメーション |
+|---|---|
+| 歩数リング（初回） | スケール 0.72→1.0 バウンス（MediumBouncy spring） |
+| 歩数カウンター | 数値ロールアップ（NoBouncy spring、StiffnessLow） |
+| 歩数リング進捗 | 円弧の伸び（NoBouncy spring、StiffnessLow） |
+| 歩数リング色（目標達成） | primary→tertiary カラー遷移（1200ms tween） |
+| 気圧チップ・インサイト | フェード＋縦展開（300〜400ms） |
+| 体調フォーム（初回） | 200ms 遅延後にスライドアップ＋フェード（MediumBouncy spring） |
+| 棒グラフ | バーが下から上に成長（700ms FastOutSlow） |
+| 折れ線グラフ | 左から右へ線が描画される（900ms FastOutSlow） |
+| 相関バー | spring アニメーションで 0 から伸びる（MediumBouncy spring） |
+| オンボーディングドット | ピル幅 8dp→24dp（MediumBouncy spring） |
 
 ---
 
-## 6. 権限
+## 13. テーマ・カラー
 
-| 権限 | 必須/任意 | 用途 |
-|------|-----------|------|
-| `ACTIVITY_RECOGNITION` | 必須 | 歩数センサー読み取り（Android 10+） |
-| `ACCESS_COARSE_LOCATION` | 任意 | 気圧取得のための位置情報 |
-| `INTERNET` | 必須 | OpenWeatherMap API 通信 |
-| `health.READ_STEPS` | 任意 | Health Connect から歩数を読む |
-| `health.WRITE_STEPS` | 任意 | Health Connect へ歩数を書き込む |
-| `health.READ_TOTAL_CALORIES_BURNED` | 任意 | Health Connect 連携 |
-| `POST_NOTIFICATIONS` | 任意 | 将来的な朝リマインダー用（未実装） |
-| `RECEIVE_BOOT_COMPLETED` | 任意 | 将来的な WorkManager 用（未実装） |
+- Material You (Material 3) ベース
+- ベースカラー: セージグリーン系（`#8FA68E`）
+- ConditionColors（0〜5）: 緑系（良好）〜赤系（不調）の 6 段階
 
----
-
-## 7. テーマ・デザイン
-
-### テーマ一覧
-
-| 選択 | 背景色 | プライマリ | 用途 |
-|------|--------|-----------|------|
-| システム (端末ライト時) | クリーム `#FAF7F2` | セージグリーン `#8FA68E` | 温かみ・自然 |
-| システム (端末ダーク時) | ダーク `#1A1A1A` | `#6D8A6C` | ダーク |
-| ライト | 純白 `#FFFFFF` | スレートブルー `#7A9BAF` | クリーン・クール |
-| ダーク | ダーク `#1A1A1A` | `#6D8A6C` | ダーク |
-
-### 体調レベル配色（ConditionColors）
-
-| レベル | 色 | 意味 |
-|--------|-----|------|
-| 0 | `#E3EDE0` | 穏やか（薄緑） |
-| 1 | `#D0E0CC` | 少し |
-| 2 | `#B8D0B2` | やや |
-| 3 | `#EFD9B8` | 気になる（橙） |
-| 4 | `#E5BFAF` | つらい |
-| 5 | `#D6A5A0` | とてもつらい（赤） |
+| レベル | 意味 |
+|---|---|
+| 0 | 良好 |
+| 1 | やや気になる |
+| 2 | 少し不調 |
+| 3 | 不調 |
+| 4 | かなり不調 |
+| 5 | 最悪 |
 
 ---
 
-## 8. 外部連携
+## 14. 権限一覧
 
-### OpenWeatherMap
+| 権限 | 用途 | 必須 |
+|---|---|---|
+| `ACTIVITY_RECOGNITION` | 歩数センサー読み取り | 任意 |
+| `ACCESS_COARSE_LOCATION` | 気圧取得用の位置情報 | 任意 |
+| Health Connect `StepsRecord` 読み取り | 歩数の取得 | 任意 |
 
-- エンドポイント: `https://api.openweathermap.org/data/2.5/weather`
-- パラメータ: `lat`, `lon`, `appid`
-- 取得値: `main.pressure` (hPa)
-- タイミング: アプリ起動時・onResume 時（当日未取得の場合のみ）
-- 位置情報取得順:
-  1. `getLastKnownLocation(NETWORK_PROVIDER)`
-  2. `getLastKnownLocation(GPS_PROVIDER)`
-  3. `getLastKnownLocation(PASSIVE_PROVIDER)`
-  4. `requestSingleUpdate`（5 秒タイムアウト）
-
-### Health Connect（書き込み＋読み込み）
-
-- **連携方法**: 設定 → 「Health Connect 連携」→ `PermissionController.createRequestPermissionResultContract()` で正式に権限リクエスト。これにより StepLog が HC の接続アプリ一覧に登録される。
-- **書き込み**: センサーで計測した当日歩数を、`refreshSteps()` のたびに HC へ書き込む（`writeSteps`）。
-  - 自アプリが過去に書いた当日記録を `deleteRecords`（時間範囲）で削除してから 1 件挿入し、二重計上を防止（HC ではアプリは自分が書いた記録のみ削除可能）。
-  - これにより Google Fit 等の書き込み元が無くても HC に歩数が必ず存在し、他のヘルスアプリと共有できる。
-- **読み込み**: センサーが利用不可の端末では HC から歩数を読む（フォールバック）。
-- **アプリ発見性**: `PermissionsRationaleActivity` を登録。
-  - Android 13 以下: `androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE`
-  - Android 14 以上: `android.intent.action.VIEW_PERMISSION_USAGE` + `category.HEALTH_PERMISSIONS`
-- **端末互換**: contract 起動に失敗する端末向けに、HC 設定画面（`ACTION_HEALTH_CONNECT_SETTINGS`）を開くフォールバックを用意。
+すべての権限は任意。未許可の場合でも体調・体重・備考の記録は正常に動作する。
 
 ---
 
-## 9. ビルド
+## 15. データ方針
 
-### デバッグ APK
-
-```bash
-# Windows
-.\gradlew assembleDebug
-# 出力先: app\build\outputs\apk\debug\app-debug.apk
-
-# Linux / macOS
-./gradlew assembleDebug
-```
-
-### リリース APK
-
-```bash
-.\gradlew assembleRelease
-# 出力先: app\build\outputs\apk\release\app-release.apk
-# ※ リリースビルドには署名設定が別途必要
-```
-
-### リポジトリ
-
-- GitHub: `metal-saito/steplog` (main ブランチ)
-- パッケージ名: `com.cellomsai.steplog`
+- すべての記録データは端末内 Room DB にのみ保存
+- 気圧取得のみ外部 API（OpenWeatherMap）を使用。API キーはユーザー自身が取得・登録
+- データエクスポート: CSV 形式でシェアシートへ書き出し（クラウド同期機能なし）
+- データ削除: 設定画面から全件削除可能
+- 過去日の歩数は変更不可（当日のみ自動更新）

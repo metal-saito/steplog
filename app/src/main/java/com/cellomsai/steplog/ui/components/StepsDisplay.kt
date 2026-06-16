@@ -1,5 +1,6 @@
 package com.cellomsai.steplog.ui.components
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateIntAsState
@@ -78,7 +79,13 @@ fun StepsDisplay(
     )
 
     val trackColor = MaterialTheme.colorScheme.surfaceVariant
-    val progressColor = MaterialTheme.colorScheme.primary
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val tertiaryColor = MaterialTheme.colorScheme.tertiary
+    val progressColor by animateColorAsState(
+        targetValue = if (steps >= STEP_GOAL) tertiaryColor else primaryColor,
+        animationSpec = tween(durationMillis = 1200),
+        label = "ring_color",
+    )
 
     Box(
         modifier = modifier
@@ -129,9 +136,9 @@ fun StepsDisplay(
                 color = MaterialTheme.colorScheme.onBackground,
             )
             Text(
-                text = "歩",
+                text = if (steps >= STEP_GOAL) "目標達成" else "歩",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (steps >= STEP_GOAL) tertiaryColor else MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
