@@ -8,7 +8,7 @@ import com.cellomsai.steplog.data.database.entity.DailyRecord
 
 @Database(
     entities = [DailyRecord::class],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -20,6 +20,13 @@ abstract class AppDatabase : RoomDatabase() {
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE daily_records ADD COLUMN weightKg REAL")
+            }
+        }
+
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE daily_records ADD COLUMN precipitationMm REAL")
+                db.execSQL("ALTER TABLE daily_records ADD COLUMN weatherCode INTEGER")
             }
         }
     }

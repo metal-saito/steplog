@@ -38,6 +38,20 @@ interface DailyRecordDao {
 
     @Query("""
         UPDATE daily_records
+        SET pressure = :pressure, precipitationMm = :precipitationMm,
+            weatherCode = :weatherCode, updatedAt = :updatedAt
+        WHERE date = :date
+    """)
+    suspend fun updateWeather(
+        date: String,
+        pressure: Float,
+        precipitationMm: Float,
+        weatherCode: Int?,
+        updatedAt: Long,
+    ): Int
+
+    @Query("""
+        UPDATE daily_records
         SET dizzinessLevel = :dizziness, fatigueLevel = :fatigue,
             sleepHours = :sleep, memo = :memo, weightKg = :weightKg, updatedAt = :updatedAt
         WHERE date = :date

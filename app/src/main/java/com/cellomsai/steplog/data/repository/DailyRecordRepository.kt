@@ -64,6 +64,25 @@ class DailyRecordRepository @Inject constructor(
         if (updated == 0) dao.upsert(DailyRecord(date = date.toString(), pressure = pressure))
     }
 
+    /** 当日の気圧・降水量・天気コードをまとめて保存する。 */
+    suspend fun saveWeather(
+        date: LocalDate,
+        pressure: Float,
+        precipitationMm: Float,
+        weatherCode: Int?,
+    ) {
+        val now = System.currentTimeMillis()
+        val updated = dao.updateWeather(date.toString(), pressure, precipitationMm, weatherCode, now)
+        if (updated == 0) dao.upsert(
+            DailyRecord(
+                date = date.toString(),
+                pressure = pressure,
+                precipitationMm = precipitationMm,
+                weatherCode = weatherCode,
+            )
+        )
+    }
+
     suspend fun upsertAll(records: List<DailyRecord>) = dao.upsertAll(records)
 
     suspend fun deleteByDate(date: LocalDate) = dao.deleteByDate(date.toString())

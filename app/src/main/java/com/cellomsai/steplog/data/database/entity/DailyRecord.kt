@@ -11,6 +11,8 @@ data class DailyRecord(
     val fatigueLevel: Int? = null,          // 0-5
     val sleepHours: Float? = null,          // 0.0-12.0
     val pressure: Float? = null,            // morning pressure in hPa
+    val precipitationMm: Float? = null,     // precipitation (mm); null = not fetched, 0 = fetched & dry
+    val weatherCode: Int? = null,           // OpenWeatherMap condition code (5xx rain, 800 clear, ...)
     val memo: String? = null,
     val weightKg: Float? = null,
     val createdAt: Long = System.currentTimeMillis(),

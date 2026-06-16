@@ -30,6 +30,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
@@ -50,6 +52,8 @@ fun BodyConditionInput(
     modifier: Modifier = Modifier,
 ) {
     val conditionLabels = stringArrayResource(R.array.condition_labels)
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
 
     var dizziness by rememberSaveable(initialDizziness) { mutableStateOf(initialDizziness) }
     var fatigue by rememberSaveable(initialFatigue) { mutableStateOf(initialFatigue) }
@@ -150,6 +154,9 @@ fun BodyConditionInput(
 
             Button(
                 onClick = {
+                    // 保存メッセージ（Snackbar）が隠れないようキーボードを閉じてフォーカスを外す
+                    keyboardController?.hide()
+                    focusManager.clearFocus()
                     onSave(dizziness, fatigue, sleepHours, weightText.toFloatOrNull(), memo.ifBlank { null })
                 },
                 enabled = !isSaving,
