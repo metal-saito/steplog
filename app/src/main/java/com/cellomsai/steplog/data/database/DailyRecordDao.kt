@@ -36,6 +36,14 @@ interface DailyRecordDao {
     @Query("UPDATE daily_records SET pressure = :pressure, updatedAt = :updatedAt WHERE date = :date")
     suspend fun updatePressure(date: String, pressure: Float, updatedAt: Long): Int
 
+    // 降水量が未取得（null）の日にだけ書き込む（既存値・他カラムを壊さない）
+    @Query("""
+        UPDATE daily_records
+        SET precipitationMm = :precipitationMm, updatedAt = :updatedAt
+        WHERE date = :date AND precipitationMm IS NULL
+    """)
+    suspend fun fillPrecipitationIfMissing(date: String, precipitationMm: Float, updatedAt: Long): Int
+
     @Query("""
         UPDATE daily_records
         SET pressure = :pressure, precipitationMm = :precipitationMm,
@@ -52,7 +60,7 @@ interface DailyRecordDao {
 
     @Query("""
         UPDATE daily_records
-        SET dizzinessLevel = :dizziness, fatigueLevel = :fatigue,
+        SET dizzinessLevel = :dizziness, fatigueLevel = :fatigue, tinnitusLevel = :tinnitus,
             sleepHours = :sleep, memo = :memo, weightKg = :weightKg, updatedAt = :updatedAt
         WHERE date = :date
     """)
@@ -60,6 +68,7 @@ interface DailyRecordDao {
         date: String,
         dizziness: Int?,
         fatigue: Int?,
+        tinnitus: Int?,
         sleep: Float?,
         memo: String?,
         weightKg: Float?,

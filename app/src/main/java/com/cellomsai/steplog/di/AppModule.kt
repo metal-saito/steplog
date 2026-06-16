@@ -1,5 +1,6 @@
 package com.cellomsai.steplog.di
 
+import com.cellomsai.steplog.data.weather.OpenMeteoService
 import com.cellomsai.steplog.data.weather.WeatherApiService
 import dagger.Module
 import dagger.Provides
@@ -24,4 +25,12 @@ object AppModule {
     @Singleton
     fun provideWeatherApiService(retrofit: Retrofit): WeatherApiService =
         retrofit.create(WeatherApiService::class.java)
+
+    @Provides
+    @Singleton
+    fun provideOpenMeteoService(): OpenMeteoService = Retrofit.Builder()
+        .baseUrl("https://api.open-meteo.com/")
+        .addConverterFactory(GsonConverterFactory.create())
+        .build()
+        .create(OpenMeteoService::class.java)
 }

@@ -44,11 +44,12 @@ import com.cellomsai.steplog.ui.theme.StepLogTheme
 fun BodyConditionInput(
     initialDizziness: Int?,
     initialFatigue: Int?,
+    initialTinnitus: Int?,
     initialSleepHours: Float,
     initialWeightKg: Float?,
     initialMemo: String,
     isSaving: Boolean,
-    onSave: (dizziness: Int?, fatigue: Int?, sleepHours: Float?, weightKg: Float?, memo: String?) -> Unit,
+    onSave: (dizziness: Int?, fatigue: Int?, tinnitus: Int?, sleepHours: Float?, weightKg: Float?, memo: String?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val conditionLabels = stringArrayResource(R.array.condition_labels)
@@ -57,6 +58,7 @@ fun BodyConditionInput(
 
     var dizziness by rememberSaveable(initialDizziness) { mutableStateOf(initialDizziness) }
     var fatigue by rememberSaveable(initialFatigue) { mutableStateOf(initialFatigue) }
+    var tinnitus by rememberSaveable(initialTinnitus) { mutableStateOf(initialTinnitus) }
     var sleepHours by rememberSaveable(initialSleepHours) { mutableFloatStateOf(initialSleepHours) }
     var weightText by rememberSaveable(initialWeightKg) {
         mutableStateOf(initialWeightKg?.let { "%.1f".format(it) } ?: "")
@@ -91,6 +93,13 @@ fun BodyConditionInput(
                 selected = fatigue,
                 labels = conditionLabels,
                 onSelect = { fatigue = it },
+            )
+
+            ConditionSegment(
+                label = "耳鳴り",
+                selected = tinnitus,
+                labels = conditionLabels,
+                onSelect = { tinnitus = it },
             )
 
             Column {
@@ -157,7 +166,7 @@ fun BodyConditionInput(
                     // 保存メッセージ（Snackbar）が隠れないようキーボードを閉じてフォーカスを外す
                     keyboardController?.hide()
                     focusManager.clearFocus()
-                    onSave(dizziness, fatigue, sleepHours, weightText.toFloatOrNull(), memo.ifBlank { null })
+                    onSave(dizziness, fatigue, tinnitus, sleepHours, weightText.toFloatOrNull(), memo.ifBlank { null })
                 },
                 enabled = !isSaving,
                 modifier = Modifier.fillMaxWidth(),
@@ -207,11 +216,12 @@ private fun BodyConditionInputPreview() {
         BodyConditionInput(
             initialDizziness = null,
             initialFatigue = null,
+            initialTinnitus = null,
             initialSleepHours = 7f,
             initialWeightKg = null,
             initialMemo = "",
             isSaving = false,
-            onSave = { _, _, _, _, _ -> },
+            onSave = { _, _, _, _, _, _ -> },
         )
     }
 }

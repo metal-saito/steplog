@@ -19,9 +19,32 @@ import javax.inject.Singleton
 @Singleton
 class WeatherRepository @Inject constructor(
     private val api: WeatherApiService,
+    private val openMeteo: OpenMeteoService,
     private val userPreferences: UserPreferences,
     @ApplicationContext private val context: Context,
 ) {
+    /**
+     * 過去〜当日の日次降水量（mm）を日付（"yyyy-MM-dd"）→ mm のマップで取得する。
+     * Open-Meteo を使用するため API キーは不要（位置情報のみ）。失敗時は null。
+     *
+     * @param pastDays 何日前まで遡って取得するか（最大 92）
+     */
+    suspend fun fetchPrecipitationHistory(pastDays: Int = 92): Map<String, Float>? {
+        val location = getLocation() ?: return null
+        return runCatching {
+            val response = openMeteo.getDailyPrecipitation(
+                lat = location.latitude,
+                lon = location.longitude,
+                pastDays = pastDays.coerceIn(1, 92),
+            )
+            val daily = response.daily ?: return@runCatching emptyMap<String, Float>()
+            daily.time.mapIndexedNotNull { i, date ->
+                val mm = daily.precipitationSum.getOrNull(i) ?: return@mapIndexedNotNull null
+                date to mm
+            }.toMap()
+        }.getOrNull()
+    }
+
     /**
      * 当日の天気（気圧・降水量・天気コード）を取得する。
      * API キー未設定・位置情報なし・通信失敗のいずれかなら null。

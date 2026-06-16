@@ -20,7 +20,6 @@ import javax.inject.Inject
 
 data class SettingsUiState(
     val appTheme: AppTheme = AppTheme.SYSTEM,
-    val weatherApiKey: String = "",
     val message: String? = null,
     val csvFile: File? = null,
     val healthConnectAvailable: Boolean = false,
@@ -42,11 +41,6 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             userPreferences.appTheme.collect { theme ->
                 _uiState.update { it.copy(appTheme = theme) }
-            }
-        }
-        viewModelScope.launch {
-            userPreferences.weatherApiKey.collect { key ->
-                _uiState.update { it.copy(weatherApiKey = key) }
             }
         }
         refreshHealthConnectState()
@@ -78,31 +72,20 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { userPreferences.setAppTheme(theme) }
     }
 
-    fun onApiKeyChange(key: String) {
-        _uiState.update { it.copy(weatherApiKey = key) }
-    }
-
-    fun saveApiKey() {
-        viewModelScope.launch {
-            userPreferences.setWeatherApiKey(_uiState.value.weatherApiKey)
-            _uiState.update { it.copy(message = "APIキーを保存しました") }
-        }
-    }
-
     fun exportCsv() {
         viewModelScope.launch {
             runCatching {
                 val records = repository.getAllForExport()
                 val csv = buildString {
                     appendLine(
-                        "date,steps,dizziness_level,fatigue_level,sleep_hours," +
+                        "date,steps,dizziness_level,fatigue_level,tinnitus_level,sleep_hours," +
                             "pressure,precipitation_mm,weather_code,weight_kg,memo"
                     )
                     records.forEach { r ->
                         appendLine(
                             "${r.date},${r.steps},${r.dizzinessLevel ?: ""},${r.fatigueLevel ?: ""}," +
-                                "${r.sleepHours ?: ""},${r.pressure ?: ""},${r.precipitationMm ?: ""}," +
-                                "${r.weatherCode ?: ""},${r.weightKg ?: ""}," +
+                                "${r.tinnitusLevel ?: ""},${r.sleepHours ?: ""},${r.pressure ?: ""}," +
+                                "${r.precipitationMm ?: ""},${r.weatherCode ?: ""},${r.weightKg ?: ""}," +
                                 "\"${(r.memo ?: "").replace("\"", "\"\"")}\""
                         )
                     }
