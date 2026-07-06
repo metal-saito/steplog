@@ -1,19 +1,24 @@
 package com.cellomsai.steplog.ui.screens.settings
 
 import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.cellomsai.steplog.data.backup.BackupData
 import com.cellomsai.steplog.data.healthconnect.HealthConnectManager
 import com.cellomsai.steplog.data.preferences.UserPreferences
 import com.cellomsai.steplog.data.repository.DailyRecordRepository
 import com.cellomsai.steplog.ui.theme.AppTheme
+import com.google.gson.Gson
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.time.LocalDate
 import javax.inject.Inject
@@ -22,6 +27,7 @@ data class SettingsUiState(
     val appTheme: AppTheme = AppTheme.SYSTEM,
     val message: String? = null,
     val csvFile: File? = null,
+    val backupFile: File? = null,
     val healthConnectAvailable: Boolean = false,
     val healthConnectConnected: Boolean = false,
 )
@@ -104,6 +110,62 @@ class SettingsViewModel @Inject constructor(
 
     fun onCsvShared() {
         _uiState.update { it.copy(csvFile = null) }
+    }
+
+    /** 機種変更用: 全記録を JSON バックアップに書き出し、共有シートで渡す。 */
+    fun exportBackup() {
+        viewModelScope.launch {
+            runCatching {
+                val records = repository.getAllForExport()
+                val backup = BackupData(
+                    exportedAt = System.currentTimeMillis(),
+                    records = records,
+                )
+                val json = Gson().toJson(backup)
+                val file = File(context.cacheDir, "steplog_backup_${LocalDate.now()}.json")
+                file.writeText(json)
+                file
+            }.onSuccess { file ->
+                _uiState.update { it.copy(backupFile = file) }
+            }.onFailure {
+                _uiState.update { it.copy(message = "バックアップの書き出しに失敗しました") }
+            }
+        }
+    }
+
+    fun onBackupShared() {
+        _uiState.update { it.copy(backupFile = null) }
+    }
+
+    /**
+     * 機種変更用: 選択された JSON バックアップを読み込んで復元する。
+     * 同一日付の記録はバックアップ側で上書きされる（マージ）。
+     */
+    fun importBackup(uri: Uri) {
+        viewModelScope.launch {
+            val result = runCatching {
+                val json = withContext(Dispatchers.IO) {
+                    context.contentResolver.openInputStream(uri)?.use { input ->
+                        input.readBytes().toString(Charsets.UTF_8)
+                    } ?: error("ファイルを開けません")
+                }
+                val backup = Gson().fromJson(json, BackupData::class.java)
+                    ?: error("バックアップを解析できません")
+                val records = backup.records
+                require(records.isNotEmpty()) { "復元できる記録がありません" }
+                repository.upsertAll(records)
+                records.size
+            }
+            result
+                .onSuccess { count ->
+                    _uiState.update { it.copy(message = "${count}件の記録を復元しました") }
+                }
+                .onFailure {
+                    _uiState.update {
+                        it.copy(message = "復元に失敗しました。正しいバックアップファイルか確認してください。")
+                    }
+                }
+        }
     }
 
     fun deleteAll() {

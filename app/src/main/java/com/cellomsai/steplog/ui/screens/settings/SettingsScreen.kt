@@ -2,6 +2,7 @@ package com.cellomsai.steplog.ui.screens.settings
 
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -59,6 +60,14 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showRestoreDialog by remember { mutableStateOf(false) }
+
+    // バックアップ JSON を選択するファイルピッカー（機種変更の復元用）
+    val pickBackup = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) viewModel.importBackup(uri)
+    }
 
     // Health Connect 権限リクエスト（正式な contract。これで HC の接続アプリ一覧に登録される）
     val requestHcPermissions = rememberLauncherForActivityResult(
@@ -104,6 +113,26 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
             context.startActivity(Intent.createChooser(intent, "CSV を共有"))
         }
         viewModel.onCsvShared()
+    }
+
+    // バックアップ JSON が準備できたら共有シートを開く
+    LaunchedEffect(uiState.backupFile) {
+        val file = uiState.backupFile ?: return@LaunchedEffect
+        runCatching {
+            val uri = FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                file,
+            )
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "application/json"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                putExtra(Intent.EXTRA_SUBJECT, "StepLog バックアップ")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            context.startActivity(Intent.createChooser(intent, "バックアップを保存・共有"))
+        }
+        viewModel.onBackupShared()
     }
 
     Scaffold(
@@ -180,6 +209,33 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                 }
             }
 
+            // データの移行（機種変更）
+            SettingsSection(title = "データの移行（機種変更）") {
+                Text(
+                    text = "機種変更のときは、旧端末で「バックアップを書き出す」でファイルを保存し、" +
+                        "新端末で「バックアップから復元」で読み込むと記録を引き継げます。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(
+                    onClick = { viewModel.exportBackup() },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondary,
+                    ),
+                ) {
+                    Text("バックアップを書き出す")
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = { showRestoreDialog = true },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("バックアップから復元")
+                }
+            }
+
             // Health Connect 連携
             if (uiState.healthConnectAvailable) {
                 SettingsSection(title = "Health Connect 連携（任意）") {
@@ -243,6 +299,36 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteDialog = false }) {
+                    Text("キャンセル")
+                }
+            },
+        )
+    }
+
+    if (showRestoreDialog) {
+        AlertDialog(
+            onDismissRequest = { showRestoreDialog = false },
+            title = { Text("バックアップから復元") },
+            text = {
+                Text(
+                    "バックアップファイル（JSON）を選んで記録を復元します。" +
+                        "同じ日付の記録はバックアップの内容で上書きされます。"
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showRestoreDialog = false
+                    runCatching {
+                        pickBackup.launch(
+                            arrayOf("application/json", "application/octet-stream", "text/plain", "*/*")
+                        )
+                    }
+                }) {
+                    Text("ファイルを選ぶ")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRestoreDialog = false }) {
                     Text("キャンセル")
                 }
             },
