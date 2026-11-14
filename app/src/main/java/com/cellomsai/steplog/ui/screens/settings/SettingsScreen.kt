@@ -241,9 +241,11 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                 SettingsSection(title = "Health Connect 連携（任意）") {
                     Text(
                         text = if (uiState.healthConnectConnected) {
-                            "連携済みです。計測した歩数が Health Connect に書き込まれ、他のヘルスアプリと共有されます。"
+                            "連携済みです。歩数を読み取ります。睡眠の読み取りも許可すると、" +
+                                "Google ヘルス・Fit などの睡眠記録から睡眠時間が自動で入ります（許可しない場合は手入力）。"
                         } else {
-                            "連携すると、StepLog が計測した歩数を Health Connect に書き込み、他のヘルスアプリと共有できます。歩数の読み込みにも対応します。"
+                            "連携すると、Health Connect から歩数を読み取れます。睡眠の読み取りも許可すると、" +
+                                "Google ヘルス・Fit などの睡眠記録から睡眠時間が自動で入ります（任意）。"
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,

@@ -33,6 +33,7 @@ class DailyRecordRepository @Inject constructor(
         dizzinessLevel: Int?,
         fatigueLevel: Int?,
         tinnitusLevel: Int?,
+        headacheLevel: Int?,
         sleepHours: Float?,
         weightKg: Float?,
         memo: String?,
@@ -43,6 +44,7 @@ class DailyRecordRepository @Inject constructor(
             dizziness = dizzinessLevel,
             fatigue = fatigueLevel,
             tinnitus = tinnitusLevel,
+            headache = headacheLevel,
             sleep = sleepHours,
             memo = memo,
             weightKg = weightKg,
@@ -54,11 +56,24 @@ class DailyRecordRepository @Inject constructor(
                 dizzinessLevel = dizzinessLevel,
                 fatigueLevel = fatigueLevel,
                 tinnitusLevel = tinnitusLevel,
+                headacheLevel = headacheLevel,
                 sleepHours = sleepHours,
                 memo = memo,
                 weightKg = weightKg,
             )
         )
+    }
+
+    /**
+     * Health Connect から取得した睡眠時間を、まだ睡眠時間が未入力の日にだけ保存する。
+     * 手入力済みの値は上書きしない。その日のレコードが無ければ新規作成する。
+     */
+    suspend fun fillSleepHoursIfMissing(date: LocalDate, sleepHours: Float) {
+        val now = System.currentTimeMillis()
+        val updated = dao.fillSleepHoursIfMissing(date.toString(), sleepHours, now)
+        if (updated == 0 && dao.findByDate(date.toString()) == null) {
+            dao.upsert(DailyRecord(date = date.toString(), sleepHours = sleepHours))
+        }
     }
 
     suspend fun savePressure(date: LocalDate, pressure: Float) {

@@ -84,13 +84,13 @@ class SettingsViewModel @Inject constructor(
                 val records = repository.getAllForExport()
                 val csv = buildString {
                     appendLine(
-                        "date,steps,dizziness_level,fatigue_level,tinnitus_level,sleep_hours," +
+                        "date,steps,dizziness_level,fatigue_level,tinnitus_level,headache_level,sleep_hours," +
                             "pressure,precipitation_mm,weather_code,weight_kg,memo"
                     )
                     records.forEach { r ->
                         appendLine(
                             "${r.date},${r.steps},${r.dizzinessLevel ?: ""},${r.fatigueLevel ?: ""}," +
-                                "${r.tinnitusLevel ?: ""},${r.sleepHours ?: ""},${r.pressure ?: ""}," +
+                                "${r.tinnitusLevel ?: ""},${r.headacheLevel ?: ""},${r.sleepHours ?: ""},${r.pressure ?: ""}," +
                                 "${r.precipitationMm ?: ""},${r.weatherCode ?: ""},${r.weightKg ?: ""}," +
                                 "\"${(r.memo ?: "").replace("\"", "\"\"")}\""
                         )

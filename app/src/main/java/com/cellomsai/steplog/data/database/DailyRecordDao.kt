@@ -44,6 +44,14 @@ interface DailyRecordDao {
     """)
     suspend fun fillPrecipitationIfMissing(date: String, precipitationMm: Float, updatedAt: Long): Int
 
+    // 睡眠時間が未入力（null）の日にだけ書き込む（手入力済みの値は上書きしない）
+    @Query("""
+        UPDATE daily_records
+        SET sleepHours = :sleepHours, updatedAt = :updatedAt
+        WHERE date = :date AND sleepHours IS NULL
+    """)
+    suspend fun fillSleepHoursIfMissing(date: String, sleepHours: Float, updatedAt: Long): Int
+
     @Query("""
         UPDATE daily_records
         SET pressure = :pressure, precipitationMm = :precipitationMm,
@@ -61,6 +69,7 @@ interface DailyRecordDao {
     @Query("""
         UPDATE daily_records
         SET dizzinessLevel = :dizziness, fatigueLevel = :fatigue, tinnitusLevel = :tinnitus,
+            headacheLevel = :headache,
             sleepHours = :sleep, memo = :memo, weightKg = :weightKg, updatedAt = :updatedAt
         WHERE date = :date
     """)
@@ -69,6 +78,7 @@ interface DailyRecordDao {
         dizziness: Int?,
         fatigue: Int?,
         tinnitus: Int?,
+        headache: Int?,
         sleep: Float?,
         memo: String?,
         weightKg: Float?,
