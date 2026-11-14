@@ -216,11 +216,12 @@ fun GraphScreen(viewModel: GraphViewModel = hiltViewModel()) {
                 }
 
                 // 体調グラフ
-                ChartCard(title = "めまい度・疲労度・耳鳴り") {
+                ChartCard(title = "めまい度・疲労度・耳鳴り・頭痛") {
                     ConditionChart(
                         dizziness = uiState.records.map { it.dizzinessLevel },
                         fatigue = uiState.records.map { it.fatigueLevel },
                         tinnitus = uiState.records.map { it.tinnitusLevel },
+                        headache = uiState.records.map { it.headacheLevel },
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
@@ -483,12 +484,18 @@ private fun ConditionChart(
     dizziness: List<Int?>,
     fatigue: List<Int?>,
     tinnitus: List<Int?>,
+    headache: List<Int?>,
     modifier: Modifier = Modifier,
 ) {
     val surfaceVariant = MaterialTheme.colorScheme.surfaceVariant
 
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        listOf("めまい" to dizziness, "疲労" to fatigue, "耳鳴り" to tinnitus).forEach { (label, levels) ->
+        listOf(
+            "めまい" to dizziness,
+            "疲労" to fatigue,
+            "耳鳴り" to tinnitus,
+            "頭痛" to headache,
+        ).forEach { (label, levels) ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,

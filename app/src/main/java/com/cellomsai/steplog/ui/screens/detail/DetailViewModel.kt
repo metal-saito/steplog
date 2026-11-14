@@ -3,6 +3,7 @@ package com.cellomsai.steplog.ui.screens.detail
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cellomsai.steplog.data.database.entity.DailyRecord
+import com.cellomsai.steplog.data.healthconnect.HealthConnectManager
 import com.cellomsai.steplog.data.repository.DailyRecordRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,11 +22,14 @@ data class DetailUiState(
     val isSaving: Boolean = false,
     val savedToastVisible: Boolean = false,
     val errorMessage: String? = null,
+    // Health Connect から取得できたその日の睡眠時間（null = 取得できない → 手入力のまま）
+    val healthConnectSleepHours: Float? = null,
 )
 
 @HiltViewModel
 class DetailViewModel @Inject constructor(
     private val repository: DailyRecordRepository,
+    private val healthConnect: HealthConnectManager,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DetailUiState())
@@ -48,14 +52,29 @@ class DetailViewModel @Inject constructor(
                 _uiState.update { it.copy(record = record) }
             }
         }
+        // その日の睡眠記録が Health Connect にあれば取得（未入力なら保存）。失敗しても何もしない
+        viewModelScope.launch {
+            if (date.isAfter(LocalDate.now())) return@launch
+            val hours = runCatching { healthConnect.readSleepHours(date) }.getOrNull()
+            _uiState.update { it.copy(healthConnectSleepHours = hours) }
+            if (hours != null) runCatching { repository.fillSleepHoursIfMissing(date, hours) }
+        }
     }
 
-    fun save(dizziness: Int?, fatigue: Int?, tinnitus: Int?, sleepHours: Float?, weightKg: Float?, memo: String?) {
+    fun save(
+        dizziness: Int?,
+        fatigue: Int?,
+        tinnitus: Int?,
+        headache: Int?,
+        sleepHours: Float?,
+        weightKg: Float?,
+        memo: String?,
+    ) {
         val date = currentDate ?: return
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true) }
             runCatching {
-                repository.saveBodyCondition(date, dizziness, fatigue, tinnitus, sleepHours, weightKg, memo)
+                repository.saveBodyCondition(date, dizziness, fatigue, tinnitus, headache, sleepHours, weightKg, memo)
             }.onSuccess {
                 _uiState.update { it.copy(isSaving = false, savedToastVisible = true) }
             }.onFailure {

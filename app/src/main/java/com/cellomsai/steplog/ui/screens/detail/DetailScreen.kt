@@ -85,13 +85,15 @@ fun DetailScreen(
                 initialDizziness = uiState.record?.dizzinessLevel,
                 initialFatigue = uiState.record?.fatigueLevel,
                 initialTinnitus = uiState.record?.tinnitusLevel,
+                initialHeadache = uiState.record?.headacheLevel,
                 initialSleepHours = uiState.record?.sleepHours ?: 7f,
                 initialWeightKg = uiState.record?.weightKg,
                 initialMemo = uiState.record?.memo ?: "",
                 isSaving = uiState.isSaving,
-                onSave = { dizziness, fatigue, tinnitus, sleep, weightKg, memo ->
-                    viewModel.save(dizziness, fatigue, tinnitus, sleep, weightKg, memo)
+                onSave = { dizziness, fatigue, tinnitus, headache, sleep, weightKg, memo ->
+                    viewModel.save(dizziness, fatigue, tinnitus, headache, sleep, weightKg, memo)
                 },
+                healthConnectSleepHours = uiState.healthConnectSleepHours,
             )
 
             uiState.record?.pressure?.let { pressure ->

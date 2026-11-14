@@ -45,12 +45,23 @@ fun BodyConditionInput(
     initialDizziness: Int?,
     initialFatigue: Int?,
     initialTinnitus: Int?,
+    initialHeadache: Int?,
     initialSleepHours: Float,
     initialWeightKg: Float?,
     initialMemo: String,
     isSaving: Boolean,
-    onSave: (dizziness: Int?, fatigue: Int?, tinnitus: Int?, sleepHours: Float?, weightKg: Float?, memo: String?) -> Unit,
+    onSave: (
+        dizziness: Int?,
+        fatigue: Int?,
+        tinnitus: Int?,
+        headache: Int?,
+        sleepHours: Float?,
+        weightKg: Float?,
+        memo: String?,
+    ) -> Unit,
     modifier: Modifier = Modifier,
+    // Health Connect から取得できた睡眠時間（取得できないときは null → 何も表示しない）
+    healthConnectSleepHours: Float? = null,
 ) {
     val conditionLabels = stringArrayResource(R.array.condition_labels)
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -59,6 +70,7 @@ fun BodyConditionInput(
     var dizziness by rememberSaveable(initialDizziness) { mutableStateOf(initialDizziness) }
     var fatigue by rememberSaveable(initialFatigue) { mutableStateOf(initialFatigue) }
     var tinnitus by rememberSaveable(initialTinnitus) { mutableStateOf(initialTinnitus) }
+    var headache by rememberSaveable(initialHeadache) { mutableStateOf(initialHeadache) }
     var sleepHours by rememberSaveable(initialSleepHours) { mutableFloatStateOf(initialSleepHours) }
     var weightText by rememberSaveable(initialWeightKg) {
         mutableStateOf(initialWeightKg?.let { "%.1f".format(it) } ?: "")
@@ -102,6 +114,13 @@ fun BodyConditionInput(
                 onSelect = { tinnitus = it },
             )
 
+            ConditionSegment(
+                label = "頭痛",
+                selected = headache,
+                labels = conditionLabels,
+                onSelect = { headache = it },
+            )
+
             Column {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -128,6 +147,13 @@ fun BodyConditionInput(
                         activeTrackColor = MaterialTheme.colorScheme.primary,
                     ),
                 )
+                if (healthConnectSleepHours != null) {
+                    Text(
+                        text = "Health Connect の記録: %.1f 時間（手動で変更できます）".format(healthConnectSleepHours),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
 
             OutlinedTextField(
@@ -166,7 +192,7 @@ fun BodyConditionInput(
                     // 保存メッセージ（Snackbar）が隠れないようキーボードを閉じてフォーカスを外す
                     keyboardController?.hide()
                     focusManager.clearFocus()
-                    onSave(dizziness, fatigue, tinnitus, sleepHours, weightText.toFloatOrNull(), memo.ifBlank { null })
+                    onSave(dizziness, fatigue, tinnitus, headache, sleepHours, weightText.toFloatOrNull(), memo.ifBlank { null })
                 },
                 enabled = !isSaving,
                 modifier = Modifier.fillMaxWidth(),
@@ -217,11 +243,12 @@ private fun BodyConditionInputPreview() {
             initialDizziness = null,
             initialFatigue = null,
             initialTinnitus = null,
+            initialHeadache = null,
             initialSleepHours = 7f,
             initialWeightKg = null,
             initialMemo = "",
             isSaving = false,
-            onSave = { _, _, _, _, _, _ -> },
+            onSave = { _, _, _, _, _, _, _ -> },
         )
     }
 }

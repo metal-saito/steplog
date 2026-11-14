@@ -71,9 +71,9 @@ data class RainStats(
     val diff: Float get() = rainyAvgBadness - dryAvgBadness
 }
 
-/** 不調スコア。めまい度・疲労度・耳鳴りのうち入力済みの平均。すべて未入力なら null。 */
+/** 不調スコア。めまい度・疲労度・耳鳴り・頭痛のうち入力済みの平均。すべて未入力なら null。 */
 private fun badnessOf(r: DailyRecord): Float? {
-    val values = listOfNotNull(r.dizzinessLevel, r.fatigueLevel, r.tinnitusLevel)
+    val values = listOfNotNull(r.dizzinessLevel, r.fatigueLevel, r.tinnitusLevel, r.headacheLevel)
     return if (values.isEmpty()) null else values.average().toFloat()
 }
 
@@ -100,7 +100,8 @@ data class GraphUiState(
 
     val recordedDays: Int
         get() = records.count {
-            it.dizzinessLevel != null || it.fatigueLevel != null || it.tinnitusLevel != null
+            it.dizzinessLevel != null || it.fatigueLevel != null ||
+                it.tinnitusLevel != null || it.headacheLevel != null
         }
 
     val correlationInsight: CorrelationInsight?
